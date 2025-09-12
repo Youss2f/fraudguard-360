@@ -1,0 +1,38 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm test
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: cd api-gateway && pip install -r requirements.txt
+      - run: cd api-gateway && pytest tests
+      - run: cd ml-service && pip install -r requirements.txt
+      - run: cd ml-service && pytest tests
+      - name: Build Docker images
+        run: |
+          docker build -t frontend ./frontend
+          docker build -t api-gateway ./api-gateway
+          docker build -t ml-service ./ml-service
+      - name: Scan images
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: api-gateway
+          format: table
+          exit-code: 1

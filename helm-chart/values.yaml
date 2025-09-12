@@ -1,0 +1,16 @@
+replicaCount: 2
+image:
+  repository: yourregistry/api-gateway
+  tag: latest
+resources:
+  limits:
+    cpu: 2
+    memory: 2Gi
+service:
+  type: ClusterIP
+  port: 8000
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

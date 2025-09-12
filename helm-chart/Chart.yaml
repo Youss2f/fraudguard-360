@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fraudguard-360
+description: A Helm chart for deploying the FraudGuard 360 platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
