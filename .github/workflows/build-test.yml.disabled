@@ -1,0 +1,14 @@
+# This workflow is disabled - using ci.yml instead
+# To re-enable, rename this file back to build-test.yml
+
+name: Build and Test (Disabled)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "This workflow is disabled. Using ci.yml instead."
