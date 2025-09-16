@@ -4,9 +4,14 @@ services:
     image: confluentinc/cp-kafka:7.0.1
     ports:
       - "9092:9092"
+    depends_on:
+      - zookeeper
     environment:
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.1
@@ -32,6 +37,7 @@ services:
       - neo4j
     environment:
       NEO4J_URI: bolt://neo4j:7687
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   ml-service:
     build: ./ml-service
     ports:
@@ -44,6 +50,9 @@ services:
       - "3000:3000"
     depends_on:
       - api-gateway
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_WS_URL: ws://localhost:8000/ws
   flink-jobmanager:
     image: apache/flink:1.18
     command: jobmanager
