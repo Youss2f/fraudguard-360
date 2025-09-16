@@ -1,0 +1,5 @@
+operators\FraudFeatureEnrichment.class
+sinks\Neo4jSink.class
+com\fraudguard\models\GraphOperation.class
+models\CDR.class
+com\fraudguard\GraphProcessingJob.class

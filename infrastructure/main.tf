@@ -14,8 +14,8 @@ module "neo4j" {
   source = "./modules/neo4j"
 }
 
-module "monitoring" {
-  source = "prometheus-community/prometheus/kubernetes"
-  version = "0.11.0"
-  # Config options
-}
+# module "monitoring" {
+#   source = "prometheus-community/prometheus/kubernetes"
+#   version = "0.11.0"
+#   # Config options
+# }

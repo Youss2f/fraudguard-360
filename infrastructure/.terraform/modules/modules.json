@@ -1,0 +1,1 @@
+{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"k8s_namespace","Source":"./modules/k8s","Dir":"modules/k8s"},{"Key":"kafka","Source":"./modules/kafka","Dir":"modules/kafka"},{"Key":"neo4j","Source":"./modules/neo4j","Dir":"modules/neo4j"}]}

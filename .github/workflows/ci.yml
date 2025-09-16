@@ -1,0 +1,341 @@
+name: FraudGuard-360 CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort mypy
+          pip install -r api-gateway/requirements.txt
+          pip install -r ml-service/requirements.txt
+
+      - name: Install Node.js dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Python Code Formatting (Black)
+        run: |
+          black --check --diff api-gateway/ ml-service/
+        continue-on-error: false
+
+      - name: Python Import Sorting (isort)
+        run: |
+          isort --check-only --diff api-gateway/ ml-service/
+        continue-on-error: false
+
+      - name: Python Linting (Flake8)
+        run: |
+          flake8 api-gateway/ ml-service/ --max-line-length=88 --extend-ignore=E203,W503
+
+      - name: Python Type Checking (MyPy)
+        run: |
+          mypy api-gateway/ ml-service/ --ignore-missing-imports
+
+      - name: TypeScript Linting (ESLint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: TypeScript Type Checking
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Java Code Style (Maven Checkstyle)
+        working-directory: flink-jobs
+        run: mvn checkstyle:check
+
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Python Security Check (Bandit)
+        run: |
+          pip install bandit
+          bandit -r api-gateway/ ml-service/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Upload security results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            trivy-results.sarif
+            bandit-report.json
+
+  test:
+    name: Testing & Coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fraudguard_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio httpx
+          pip install -r api-gateway/requirements.txt
+          pip install -r ml-service/requirements.txt
+
+      - name: Install Node.js dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Python Unit Tests (API Gateway)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fraudguard_test
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd api-gateway
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+        continue-on-error: false
+
+      - name: Run Python Unit Tests (ML Service)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fraudguard_test
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd ml-service
+          pytest tests/ -v --cov=inference --cov=models --cov-report=xml --cov-report=html
+        continue-on-error: false
+
+      - name: Run Frontend Unit Tests
+        working-directory: frontend
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Run Frontend E2E Tests
+        working-directory: frontend
+        run: |
+          npm run build
+          npx playwright install
+          npx playwright test
+        continue-on-error: true
+
+      - name: Upload test coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: |
+            api-gateway/coverage.xml
+            ml-service/coverage.xml
+            frontend/coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            api-gateway/htmlcov/
+            ml-service/htmlcov/
+            frontend/coverage/
+            frontend/test-results/
+
+  build:
+    name: Build & Integration
+    runs-on: ubuntu-latest
+    needs: [lint, security, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build API Gateway image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api-gateway
+          push: false
+          tags: fraudguard/api-gateway:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build ML Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ml-service
+          push: false
+          tags: fraudguard/ml-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          tags: fraudguard/frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Build Flink Jobs
+        working-directory: flink-jobs
+        run: |
+          mvn clean compile package -DskipTests
+          ls -la target/
+
+      - name: Verify Docker Compose configuration
+        run: |
+          docker-compose config
+          docker-compose build --no-cache
+
+      - name: Run integration tests
+        run: |
+          docker-compose up -d --build
+          sleep 30
+          # Health check all services
+          curl -f http://localhost:8000/health || exit 1
+          curl -f http://localhost:8001/health || exit 1
+          curl -f http://localhost:3000 || exit 1
+          docker-compose down
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            flink-jobs/target/*.jar
+            frontend/build/
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging environment
+        run: |
+          echo "🚀 Deploying to staging environment"
+          echo "This would deploy using Terraform and Kubernetes"
+          # Actual deployment commands would go here
+
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests against staging"
+          # Smoke test commands would go here
+
+  notify:
+    name: Notifications
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, build]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: ${{ needs.lint.result == 'success' && needs.security.result == 'success' && needs.test.result == 'success' && needs.build.result == 'success' }}
+        run: |
+          echo "✅ All checks passed! Ready for review."
+
+      - name: Notify on failure
+        if: ${{ needs.lint.result == 'failure' || needs.security.result == 'failure' || needs.test.result == 'failure' || needs.build.result == 'failure' }}
+        run: |
+          echo "❌ Some checks failed. Please review the logs."
