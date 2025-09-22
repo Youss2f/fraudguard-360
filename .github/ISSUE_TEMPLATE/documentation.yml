@@ -1,0 +1,70 @@
+---
+name: 📚 Documentation Update
+about: Suggest improvements to documentation
+title: '[DOCS] '
+labels: ['documentation', 'needs-triage']
+assignees: ''
+---
+
+## 📚 Documentation Issue
+
+**Type of Documentation**
+- [ ] README.md
+- [ ] API Documentation
+- [ ] Architecture Documentation
+- [ ] Deployment Guide
+- [ ] Contributing Guidelines
+- [ ] Code Comments
+- [ ] User Guide
+- [ ] Other: _______________
+
+**Issue Description**
+Describe what documentation is missing, unclear, or incorrect.
+
+## 📝 Proposed Changes
+
+**Content to Add/Update**
+Describe the specific content that needs to be added or updated.
+
+**Target Audience**
+Who is the primary audience for this documentation?
+- [ ] End Users
+- [ ] Developers
+- [ ] DevOps Engineers
+- [ ] Data Scientists
+- [ ] Product Managers
+
+## 📍 Location
+
+**File/Section**
+Specify the exact file and section that needs updating.
+
+**Current Content**
+If updating existing content, paste the current version here.
+
+**Proposed Content**
+Provide the new or updated content.
+
+## 🔗 Related Resources
+
+**Reference Materials**
+Link to any relevant resources, specifications, or examples.
+
+**Related Issues**
+Link to related issues or PRs.
+
+## ✅ Acceptance Criteria
+
+- [ ] Content is accurate and up-to-date
+- [ ] Writing is clear and concise
+- [ ] Examples are provided where appropriate
+- [ ] Formatting follows style guide
+- [ ] All links are working
+- [ ] Content is reviewed by subject matter expert
+
+## 🏷️ Priority
+
+- [ ] Critical (blocks development/deployment)
+- [ ] High (important for user experience)
+- [ ] Medium (good to have)
+- [ ] Low (nice to have)
