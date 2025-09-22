@@ -1,13 +1,13 @@
 /**
  * FraudGuard 360 - Professional Fraud Detection Platform
- * Demonstration ready for technical interviews
+ * Enterprise-grade real-time fraud prevention system
  */
 
 import React from 'react';
-import FraudDashboardDemo from './components/FraudDashboardDemo';
+import FraudDashboard from './components/FraudDashboard';
 
 function App() {
-  return <FraudDashboardDemo />;
+  return <FraudDashboard />;
 }
 
 export default App;

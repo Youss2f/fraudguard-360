@@ -301,7 +301,7 @@ class FraudDetectionE2ETests:
 
 
 if __name__ == "__main__":
-    # Run specific test for demonstration
+    # Run specific test for pipeline validation
     test_suite = FraudDetectionE2ETests()
     test_suite.setup_method()
     

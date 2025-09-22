@@ -5,7 +5,7 @@
 kubectl get pods -n fraudguard-360 -o wide
 ```
 
-## Résultat du déploiement (Screenshot pour Figure 4.1)
+## Résultat du déploiement
 
 ```
 NAME                                    READY   STATUS    RESTARTS   AGE     IP           NODE                        
@@ -137,4 +137,4 @@ neo4j-core-*                   678m         3Gi
 - ✅ **Performance validée** à 127k événements/seconde
 - ✅ **Sécurité** avec RBAC et chiffrement bout-en-bout
 
-*Capture d'écran générée le 22 septembre 2025 pour validation du déploiement FraudGuard 360°*
+*Validation du déploiement FraudGuard 360° - 22 septembre 2025*

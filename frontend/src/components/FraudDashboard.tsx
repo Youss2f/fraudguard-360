@@ -1,6 +1,6 @@
 /**
- * FRAUD DETECTION DASHBOARD DEMO
- * Professional demonstration of real-time fraud detection capabilities
+ * FRAUD DETECTION DASHBOARD
+ * Professional fraud detection system with real-time monitoring capabilities
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +14,7 @@ interface FraudAlert {
   timestamp: string;
 }
 
-const FraudDashboardDemo: React.FC = () => {
+const FraudDashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [metrics, setMetrics] = useState({
     totalCalls: 0,
@@ -206,10 +206,10 @@ const FraudDashboardDemo: React.FC = () => {
         color: '#666',
         fontSize: '14px'
       }}>
-        🛡️ Professional Fraud Detection System • Real-time Monitoring Active • Interview-Ready Demonstration Platform
+        🛡️ Professional Fraud Detection System • Real-time Monitoring Active • Enterprise Security Platform
       </div>
     </div>
   );
 };
 
-export default FraudDashboardDemo;
+export default FraudDashboard;

@@ -69,14 +69,14 @@
 - **Story Points**: 31
 - **Statut**: ✅ Complété
 
-### **Sprint 6: Portfolio & Documentation**
+### **Sprint 6: Documentation & Maintenance**
 📅 **16 Août - 22 Septembre 2025** 
-- **Objectif**: Finalisation portfolio et présentation académique
+- **Objectif**: Finalisation documentation et maintenance système
 - **Livrables**:
-  - 🔄 Documentation portfolio professionnelle
+  - 🔄 Documentation technique complète
   - 🔄 GitHub Projects board optimisé
-  - 🔄 Préparation présentation technique
-  - 🔄 Screenshots et preuves de déploiement
+  - 🔄 Monitoring et métriques avancées
+  - 🔄 Tests de charge et optimisation
 - **Story Points**: 21
 - **Statut**: 🔄 En cours
 
@@ -134,10 +134,10 @@
 - Tests de charge validés (125k CDR/sec)
 - Monitoring complet opérationnel
 
-### **🔄 Milestone 4: Portfolio Académique** (22 Septembre)
+### **🔄 Milestone 4: Production Readiness** (22 Septembre)
 - Documentation technique finalisée  
-- Présentation et screenshots préparés
-- Validation par les encadrants académiques
+- Monitoring et alerting opérationnels
+- Validation tests de charge et performance
 
 ---
 

@@ -14,7 +14,7 @@ Valider les performances du système sous charge croissante et mesurer l'évolut
 
 ---
 
-## 📊 Résultats détaillés (Figure 4.2)
+## 📊 Résultats détaillés
 
 ### Données de performance par palier
 
@@ -36,7 +36,7 @@ Valider les performances du système sous charge croissante et mesurer l'évolut
 
 ---
 
-## 📈 Graphique de performance (Figure 4.2)
+## 📈 Graphique de performance
 
 ```
 Latence P95 (ms) │
