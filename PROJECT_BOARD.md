@@ -25,7 +25,7 @@ Our GitHub Projects board follows **Agile Scrum methodology** with 2-week sprint
 | **Sprint 3** | Weeks 5-6 | ML Service | GraphSAGE model, inference API, model training pipeline |
 | **Sprint 4** | Weeks 7-8 | Frontend Development | React dashboard, graph visualization, real-time updates |
 | **Sprint 5** | Weeks 9-10 | Integration & Deployment | End-to-end testing, Kubernetes deployment, performance tuning |
-| **Sprint 6** | Weeks 11-12 | Documentation & Polish | Technical documentation, demo preparation, final testing |
+| **Sprint 6** | Weeks 11-12 | Documentation & Polish | Technical documentation, system optimization, final testing |
 
 ## 🏗️ Board Structure
 
@@ -68,7 +68,7 @@ Our GitHub Projects board follows **Agile Scrum methodology** with 2-week sprint
 
 ## 📊 Current Sprint Status
 
-### Sprint 6: Documentation & Presentation (Current)
+### Sprint 6: Documentation & System Optimization (Current)
 
 **Sprint Goal**: Complete technical documentation, finalize system optimization, and deliver production-ready features.
 
@@ -154,7 +154,7 @@ Our GitHub Projects board follows **Agile Scrum methodology** with 2-week sprint
 ### Sprint Review
 **Duration**: 1 hour  
 **Participants**: Stakeholders, Product Owner, Development Team  
-**Outcome**: Demo completed work, gather feedback
+**Outcome**: Review completed work, gather feedback for next iterations
 
 ### Sprint Retrospective
 **Duration**: 1 hour  
