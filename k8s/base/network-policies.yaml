@@ -1,0 +1,366 @@
+# ==============================================================================
+# FraudGuard 360 - Network Policies
+# Comprehensive security isolation and traffic control
+# ==============================================================================
+
+# Default Deny All Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Frontend Access Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: frontend-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  # Allow API Gateway communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow API Gateway communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# API Gateway Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: api-gateway-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  # Allow frontend communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Allow ML Service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ml-service
+    ports:
+    - protocol: TCP
+      port: 8001
+  # Allow PostgreSQL access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Neo4j access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: neo4j
+    ports:
+    - protocol: TCP
+      port: 7687
+  # Allow Kafka access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kafka
+    ports:
+    - protocol: TCP
+      port: 9092
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# ML Service Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-service-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: ml-service-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ml-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow API Gateway communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8001
+  # Allow Flink communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: flink-taskmanager
+    ports:
+    - protocol: TCP
+      port: 8001
+  egress:
+  # Allow Neo4j access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: neo4j
+    ports:
+    - protocol: TCP
+      port: 7687
+  # Allow Kafka access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kafka
+    ports:
+    - protocol: TCP
+      port: 9092
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# Database Tier Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: database-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      tier: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow API Gateway access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+  # Allow ML Service access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ml-service
+  # Allow Flink access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: flink
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# Messaging Tier Network Policy  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: messaging-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: messaging-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      tier: messaging
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow API Gateway access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+  # Allow ML Service access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ml-service
+  # Allow Flink access
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: flink
+  # Allow Kafka internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kafka
+  # Allow Zookeeper communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: zookeeper
+  egress:
+  # Allow Kafka internal communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kafka
+  # Allow Zookeeper communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: zookeeper
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# Flink Cluster Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flink-network-policy
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: flink-network-policy
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: flink
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow Flink internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: flink
+  # Allow admin access to JobManager UI
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8081
+  egress:
+  # Allow Flink internal communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: flink
+  # Allow Kafka access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kafka
+    ports:
+    - protocol: TCP
+      port: 9092
+  # Allow Neo4j access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: neo4j
+    ports:
+    - protocol: TCP
+      port: 7687
+  # Allow ML Service access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ml-service
+    ports:
+    - protocol: TCP
+      port: 8001
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53

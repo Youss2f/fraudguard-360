@@ -1,0 +1,195 @@
+# ==============================================================================
+# FraudGuard 360 - Production Environment Values
+# High-availability production configuration
+# ==============================================================================
+
+# Production environment configuration
+global:
+  environment: "production"
+  monitoring:
+    enabled: true
+
+# Production resource allocation
+api-gateway:
+  replicaCount: 5
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 2Gi
+  autoscaling:
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+frontend:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+
+ml-service:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Production database settings
+postgresql:
+  primary:
+    persistence:
+      size: 100Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 4
+        memory: 8Gi
+
+neo4j:
+  core:
+    numberOfServers: 3
+  volumes:
+    data:
+      defaultStorageClass:
+        requests: 50Gi
+        storageClass: "fast-ssd"
+  config:
+    server.memory.heap.initial_size: "4G"
+    server.memory.heap.max_size: "8G"
+    server.memory.pagecache.size: "4G"
+
+kafka:
+  replicaCount: 3
+  persistence:
+    size: 20Gi
+    storageClass: "fast-ssd"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  zookeeper:
+    replicaCount: 3
+    persistence:
+      size: 5Gi
+
+# Production Flink cluster
+flink:
+  jobmanager:
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+  
+  taskmanager:
+    replicaCount: 4
+    resources:
+      requests:
+        cpu: 2
+        memory: 4Gi
+      limits:
+        cpu: 4
+        memory: 8Gi
+    config:
+      slots: 8
+
+# Production ingress with SSL
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "100"
+  hosts:
+    - host: fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: api-gateway
+    
+    - host: api.fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api-gateway
+  
+  tls:
+    - secretName: fraudguard-prod-tls
+      hosts:
+        - fraudguard.yourdomain.com
+        - api.fraudguard.yourdomain.com
+
+adminIngress:
+  enabled: true
+  host: admin.fraudguard.yourdomain.com
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "YOUR_ADMIN_IP_RANGES"
+  tls:
+    secretName: fraudguard-admin-prod-tls
+
+# Full security for production
+networkPolicies:
+  enabled: true
+  defaultDenyAll: true
+
+security:
+  podSecurityPolicy:
+    enabled: true
+  rbac:
+    create: true
+
+# Production monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    scrapeInterval: 15s
+    retention: "30d"
+  
+  grafana:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 10Gi
+  
+  jaeger:
+    enabled: true
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  
+  destinations:
+    - s3:
+        bucket: "fraudguard-backups"
+        region: "us-east-1"

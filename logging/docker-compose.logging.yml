@@ -1,0 +1,102 @@
+# FraudGuard 360 - Centralized Logging Configuration
+# Production-ready logging with structured output and multiple handlers
+
+version: '3.8'
+
+services:
+  # Elasticsearch for log storage and indexing
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: fraudguard-elasticsearch
+    environment:
+      - node.name=fraudguard-node
+      - cluster.name=fraudguard-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - fraudguard-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Logstash for log processing and transformation
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: fraudguard-logstash
+    volumes:
+      - ./logging/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logging/logstash/config:/usr/share/logstash/config
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx1g -Xms1g"
+    networks:
+      - fraudguard-logging
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9600 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kibana for log visualization and analysis
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: fraudguard-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=fraudguard-kibana
+      - SERVER_HOST=0.0.0.0
+    networks:
+      - fraudguard-logging
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Filebeat for log shipping from containers
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: fraudguard-filebeat
+    user: root
+    command: filebeat -e -strict.perms=false
+    volumes:
+      - ./logging/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - filebeat_data:/usr/share/filebeat/data
+    networks:
+      - fraudguard-logging
+    depends_on:
+      - elasticsearch
+      - logstash
+
+networks:
+  fraudguard-logging:
+    driver: bridge
+
+volumes:
+  elasticsearch_data:
+    driver: local
+  filebeat_data:
+    driver: local

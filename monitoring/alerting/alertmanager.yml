@@ -1,0 +1,282 @@
+# Alertmanager Configuration for FraudGuard 360
+# Production-ready alerting with proper routing and notification channels
+
+global:
+  # SMTP configuration for email alerts
+  smtp_smarthost: 'smtp.company.com:587'
+  smtp_from: 'fraudguard-alerts@company.com'
+  smtp_auth_username: 'fraudguard-alerts@company.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Slack webhook for team notifications
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+# Template definitions for alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route configuration - determines how alerts are handled
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  
+  # Routing rules for different alert types
+  routes:
+    # Critical alerts - immediate notification to on-call team
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 5m
+      continue: true
+
+    # Fraud detection specific alerts
+    - match:
+        team: fraud_detection
+      receiver: 'fraud-team'
+      group_interval: 5m
+      continue: true
+
+    # ML/Data Science team alerts
+    - match:
+        team: ml_ops
+      receiver: 'ml-team'
+      group_interval: 10m
+      continue: true
+
+    # Platform/Infrastructure alerts
+    - match:
+        team: platform
+      receiver: 'platform-team'
+      group_interval: 15m
+      continue: true
+
+    # Business metrics alerts
+    - match:
+        team: business
+      receiver: 'business-team'
+      group_interval: 30m
+      continue: true
+
+    # External dependency alerts
+    - match:
+        service: external-api
+      receiver: 'external-deps'
+      group_interval: 10m
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Suppress service-specific alerts when the entire service is down
+  - source_match:
+      alertname: ServiceDown
+    target_match:
+      service: fraudguard
+    equal: ['service', 'instance']
+
+  # Suppress high response time alerts when error rate is high
+  - source_match:
+      alertname: HighErrorRate
+    target_match:
+      alertname: HighAPIResponseTime
+    equal: ['service']
+
+  # Suppress individual component alerts when system health is critical
+  - source_match:
+      severity: critical
+      alertname: SystemHealthCritical
+    target_match_re:
+      alertname: ^(HighCPUUsage|HighMemoryUsage|DatabaseConnectionPoolExhaustion)$
+
+# Receiver definitions - notification channels
+receivers:
+  # Default catch-all receiver
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'devops@company.com'
+        subject: 'FraudGuard Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ if .Annotations.runbook_url }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+
+  # Critical alerts - multiple channels for immediate attention
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@company.com'
+        subject: '🚨 CRITICAL: FraudGuard {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          CRITICAL ALERT - IMMEDIATE ACTION REQUIRED
+          
+          {{ range .Alerts }}
+          🔥 {{ .Annotations.summary }}
+          
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          
+          {{ if .Annotations.action_required }}
+          ⚠️  Action Required: {{ .Annotations.action_required }}
+          {{ end }}
+          
+          {{ if .Annotations.runbook_url }}
+          📖 Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          
+          {{ if .Annotations.dashboard_url }}
+          📊 Dashboard: {{ .Annotations.dashboard_url }}
+          {{ end }}
+          {{ end }}
+        
+    slack_configs:
+      - channel: '#fraudguard-critical'
+        title: '🚨 Critical FraudGuard Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          
+          {{ if .Annotations.action_required }}
+          *Action Required:* {{ .Annotations.action_required }}
+          {{ end }}
+          
+          {{ if .Annotations.runbook_url }}
+          <{{ .Annotations.runbook_url }}|📖 Runbook>
+          {{ end }}
+          {{ if .Annotations.dashboard_url }}
+          <{{ .Annotations.dashboard_url }}|📊 Dashboard>
+          {{ end }}
+          {{ end }}
+        send_resolved: true
+
+    # PagerDuty integration for critical alerts
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INTEGRATION_KEY}'
+        description: 'FraudGuard Critical: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          service: '{{ range .Alerts }}{{ .Labels.service }}{{ end }}'
+          runbook: '{{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}'
+
+  # Fraud detection team alerts
+  - name: 'fraud-team'
+    slack_configs:
+      - channel: '#fraud-detection'
+        title: '🛡️ Fraud Detection Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          
+          {{ if .Annotations.impact }}
+          *Impact:* {{ .Annotations.impact }}
+          {{ end }}
+          
+          {{ if .Annotations.threshold }}
+          *Threshold:* {{ .Annotations.threshold }}
+          {{ end }}
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: 'fraud-team@company.com'
+        subject: 'Fraud Detection Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  # ML/Data Science team alerts
+  - name: 'ml-team'
+    slack_configs:
+      - channel: '#ml-ops'
+        title: '🤖 ML Model Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          
+          *Model Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          
+          {{ if .Annotations.action_required }}
+          *Action Required:* {{ .Annotations.action_required }}
+          {{ end }}
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: 'ml-team@company.com'
+        subject: 'ML Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  # Platform/Infrastructure team alerts
+  - name: 'platform-team'
+    slack_configs:
+      - channel: '#platform-ops'
+        title: '⚙️ Infrastructure Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          
+          *Infrastructure:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: 'platform-team@company.com'
+        subject: 'Infrastructure Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  # Business team alerts
+  - name: 'business-team'
+    email_configs:
+      - to: 'business-ops@company.com'
+        subject: 'Business Metrics Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          Business Alert from FraudGuard 360
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          
+          {{ if .Annotations.impact }}
+          Business Impact: {{ .Annotations.impact }}
+          {{ end }}
+          
+          {{ if .Annotations.threshold }}
+          Threshold: {{ .Annotations.threshold }}
+          {{ end }}
+          
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+
+  # External dependencies alerts
+  - name: 'external-deps'
+    slack_configs:
+      - channel: '#external-integrations'
+        title: '🔗 External Dependency Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          
+          *External Service:* {{ .Labels.api }}
+          *Impact:* {{ .Annotations.impact }}
+          *Action Required:* {{ .Annotations.action_required }}
+          {{ end }}
+        send_resolved: true

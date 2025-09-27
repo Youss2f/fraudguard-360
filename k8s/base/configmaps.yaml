@@ -1,0 +1,191 @@
+# ==============================================================================
+# FraudGuard 360 - ConfigMaps
+# Application configuration for all microservices
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fraudguard-config
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: fraudguard-360
+data:
+  # Database Configuration
+  POSTGRES_DB: "fraudguard"
+  POSTGRES_USER: "fraudguard"
+  NEO4J_USER: "neo4j"
+  
+  # Service URLs
+  NEO4J_URI: "bolt://neo4j-service:7687"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  ML_SERVICE_URL: "http://ml-service:8001"
+  API_GATEWAY_URL: "http://api-gateway-service:8000"
+  
+  # Application Settings
+  PYTHONPATH: "/app"
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  MODEL_PATH: "/app/models"
+  
+  # Flink Configuration
+  FLINK_JOBMANAGER_RPC_ADDRESS: "flink-jobmanager-service"
+  FLINK_TASKMANAGER_SLOTS: "4"
+  FLINK_PARALLELISM_DEFAULT: "2"
+  
+  # React Frontend Configuration
+  REACT_APP_ENVIRONMENT: "production"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-config
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: flink-config
+    app.kubernetes.io/part-of: fraudguard-360
+data:
+  flink-conf.yaml: |
+    # Flink Configuration for FraudGuard
+    jobmanager.rpc.address: flink-jobmanager-service
+    taskmanager.numberOfTaskSlots: 4
+    parallelism.default: 2
+    
+    # Memory Configuration
+    jobmanager.memory.process.size: 1600m
+    taskmanager.memory.process.size: 1728m
+    taskmanager.memory.flink.size: 1280m
+    
+    # Checkpointing
+    execution.checkpointing.interval: 30s
+    execution.checkpointing.min-pause: 5s
+    execution.checkpointing.timeout: 10min
+    
+    # State Backend
+    state.backend: filesystem
+    state.checkpoints.dir: file:///opt/flink/checkpoints
+    state.savepoints.dir: file:///opt/flink/savepoints
+    
+    # Kafka Configuration
+    bootstrap.servers: kafka-service:9092
+    
+    # Neo4j Configuration
+    neo4j.uri: bolt://neo4j-service:7687
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: nginx-config
+    app.kubernetes.io/part-of: fraudguard-360
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 16M;
+        
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+        
+        server {
+            listen 3000;
+            server_name localhost;
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+            
+            server_tokens off;
+            
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                try_files $uri =404;
+            }
+            
+            location /api/ {
+                proxy_pass http://api-gateway-service:8000;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+                proxy_read_timeout 300s;
+                proxy_connect_timeout 300s;
+            }
+            
+            location / {
+                try_files $uri $uri/ /index.html;
+                
+                location ~* \.html$ {
+                    add_header Cache-Control "no-cache, no-store, must-revalidate";
+                    add_header Pragma "no-cache";
+                    add_header Expires "0";
+                }
+            }
+            
+            error_page 404 /index.html;
+            error_page 500 502 503 504 /50x.html;
+            location = /50x.html {
+                root /usr/share/nginx/html;
+            }
+        }
+    }

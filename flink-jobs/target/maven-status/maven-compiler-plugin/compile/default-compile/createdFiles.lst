@@ -1,5 +1,9 @@
 operators\FraudFeatureEnrichment.class
-sinks\Neo4jSink.class
+sinks\AlertNeo4jSink.class
 com\fraudguard\models\GraphOperation.class
-models\CDR.class
 com\fraudguard\GraphProcessingJob.class
+models\UserFeatures.class
+com\fraudguard\GraphProcessingJob$TestCDRSource.class
+models\CDR.class
+processors\FraudDetectionProcessor.class
+models\FraudAlert.class

@@ -1,0 +1,87 @@
+# ==============================================================================
+# FraudGuard 360 - Ingress Helm Template
+# External access routing with SSL termination and security
+# ==============================================================================
+
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fraudguard-360.fullname" . }}-ingress
+  namespace: {{ include "fraudguard-360.namespace" . }}
+  labels:
+    {{- include "fraudguard-360.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "fraudguard-360.fullname" $ }}-{{ .service }}
+                port:
+                  number: {{ if eq .service "frontend" }}{{ $.Values.frontend.service.port }}{{ else if eq .service "api-gateway" }}{{ $.Values.api-gateway.service.port }}{{ else }}8080{{ end }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- if .Values.adminIngress.enabled -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fraudguard-360.fullname" . }}-admin-ingress
+  namespace: {{ include "fraudguard-360.namespace" . }}
+  labels:
+    {{- include "fraudguard-360.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-ingress
+  {{- with .Values.adminIngress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.adminIngress.className }}
+  ingressClassName: {{ .Values.adminIngress.className }}
+  {{- end }}
+  {{- if .Values.adminIngress.tls }}
+  tls:
+  - hosts:
+    - {{ .Values.adminIngress.host }}
+    secretName: {{ .Values.adminIngress.tls.secretName }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.adminIngress.host | quote }}
+    http:
+      paths:
+        {{- range .Values.adminIngress.paths }}
+        - path: {{ .path }}
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "fraudguard-360.fullname" $ }}-{{ .service }}
+              port:
+                number: {{ .port }}
+        {{- end }}
+{{- end }}

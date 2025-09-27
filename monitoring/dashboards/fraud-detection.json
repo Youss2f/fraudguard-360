@@ -1,0 +1,183 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "FraudGuard 360 - Fraud Detection Analytics",
+    "tags": ["fraudguard", "fraud-detection", "analytics"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Fraud Score Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "fraudguard_fraud_score_distribution",
+            "legendFormat": "Fraud Score"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Model Performance Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "fraudguard_model_accuracy_score",
+            "legendFormat": "Accuracy - {{model_name}}"
+          },
+          {
+            "expr": "fraudguard_model_precision_score",
+            "legendFormat": "Precision - {{model_name}}"
+          },
+          {
+            "expr": "fraudguard_model_recall_score",
+            "legendFormat": "Recall - {{model_name}}"
+          },
+          {
+            "expr": "fraudguard_model_f1_score",
+            "legendFormat": "F1 Score - {{model_name}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Score",
+            "min": 0,
+            "max": 1
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Fraud Cases by Severity",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(fraudguard_fraud_cases_detected_total[1h])",
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 9
+        }
+      },
+      {
+        "id": 4,
+        "title": "Detection Patterns",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(fraudguard_suspicious_patterns_detected_total[1h])",
+            "legendFormat": "{{pattern_type}}"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 9
+        }
+      },
+      {
+        "id": 5,
+        "title": "Model Inference Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(fraudguard_model_inference_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile - {{model_name}}"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(fraudguard_model_inference_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile - {{model_name}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Seconds"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 18
+        }
+      },
+      {
+        "id": 6,
+        "title": "False Positive/Negative Rates",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "fraudguard_false_positive_rate",
+            "legendFormat": "False Positive Rate"
+          },
+          {
+            "expr": "fraudguard_false_negative_rate",
+            "legendFormat": "False Negative Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Rate",
+            "min": 0,
+            "max": 1
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 18
+        }
+      },
+      {
+        "id": 7,
+        "title": "Fraud Prevention Impact",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(fraudguard_fraud_prevention_savings_total[24h])",
+            "legendFormat": "Savings (24h)"
+          },
+          {
+            "expr": "increase(fraudguard_potential_fraud_amount_total[24h])",
+            "legendFormat": "Potential Loss Prevented"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 24,
+          "x": 0,
+          "y": 27
+        }
+      }
+    ]
+  }
+}

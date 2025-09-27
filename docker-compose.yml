@@ -28,6 +28,17 @@ services:
       NEO4J_AUTH: neo4j/password
     volumes:
       - ./neo4j/data:/data
+  
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: fraudguard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
   api-gateway:
     build: ./api-gateway
     ports:

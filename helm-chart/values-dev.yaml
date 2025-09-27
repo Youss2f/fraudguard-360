@@ -1,0 +1,121 @@
+# ==============================================================================
+# FraudGuard 360 - Development Environment Values
+# Optimized for local development and testing
+# ==============================================================================
+
+# Override global settings for development
+global:
+  environment: "development"
+  monitoring:
+    enabled: false
+
+# Reduce resource requirements for development
+api-gateway:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+frontend:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+
+ml-service:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+
+# Development-friendly database settings
+postgresql:
+  primary:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+neo4j:
+  volumes:
+    data:
+      defaultStorageClass:
+        requests: 5Gi
+  config:
+    server.memory.heap.initial_size: "512M"
+    server.memory.heap.max_size: "512M"
+    server.memory.pagecache.size: "256M"
+
+kafka:
+  replicaCount: 1
+  persistence:
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  zookeeper:
+    replicaCount: 1
+    persistence:
+      size: 1Gi
+
+# Simplified Flink for development
+flink:
+  jobmanager:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  
+  taskmanager:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Disable production features
+ingress:
+  enabled: false
+
+adminIngress:
+  enabled: false
+
+networkPolicies:
+  enabled: false
+
+# Development hostnames (use NodePort or port-forwarding)
+service:
+  type: NodePort

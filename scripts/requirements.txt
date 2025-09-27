@@ -1,0 +1,5 @@
+# Kafka client for Python
+kafka-python==2.0.2
+
+# For working with shared models
+pydantic>=2.0.0

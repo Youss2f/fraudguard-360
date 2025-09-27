@@ -1,0 +1,177 @@
+# ==============================================================================
+# FraudGuard 360 - PostgreSQL Database Deployment
+# Transactional data storage for fraud cases and metadata
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: fraudguard-360
+    app.kubernetes.io/version: "15"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: fraudguard-360
+        app.kubernetes.io/version: "15"
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: fraudguard-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fraudguard-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - fraudguard
+            - -d
+            - fraudguard
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - fraudguard
+            - -d
+            - fraudguard
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+
+---
+# PostgreSQL Init Scripts ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: init-scripts
+    app.kubernetes.io/part-of: fraudguard-360
+data:
+  01-init-db.sql: |
+    -- FraudGuard 360 Database Initialization
+    -- This script will be executed when PostgreSQL starts for the first time
+    
+    -- Create extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+    
+    -- Create application user (if not using default)
+    -- Note: In production, use more secure password management
+    
+    -- Grant necessary permissions
+    GRANT ALL PRIVILEGES ON DATABASE fraudguard TO fraudguard;
+    
+    -- Create basic tables (detailed schema should be in separate migration)
+    CREATE TABLE IF NOT EXISTS fraud_cases (
+        case_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id VARCHAR(50) NOT NULL,
+        fraud_type VARCHAR(100) NOT NULL,
+        severity VARCHAR(20) NOT NULL,
+        status VARCHAR(20) DEFAULT 'open',
+        confidence_score DECIMAL(3,2),
+        risk_score DECIMAL(3,2),
+        evidence JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_fraud_cases_user_id ON fraud_cases(user_id);
+    CREATE INDEX IF NOT EXISTS idx_fraud_cases_fraud_type ON fraud_cases(fraud_type);
+    CREATE INDEX IF NOT EXISTS idx_fraud_cases_severity ON fraud_cases(severity);
+    CREATE INDEX IF NOT EXISTS idx_fraud_cases_created_at ON fraud_cases(created_at);
+    
+    -- Log completion
+    INSERT INTO fraud_cases (user_id, fraud_type, severity, status, confidence_score, risk_score, evidence)
+    VALUES ('system', 'initialization', 'info', 'completed', 1.0, 0.0, '{"message": "Database initialized successfully"}')
+    ON CONFLICT DO NOTHING;

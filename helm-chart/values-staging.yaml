@@ -1,0 +1,81 @@
+# ==============================================================================
+# FraudGuard 360 - Staging Environment Values
+# Pre-production testing environment
+# ==============================================================================
+
+# Staging environment configuration
+global:
+  environment: "staging"
+  monitoring:
+    enabled: true
+
+# Moderate resource allocation for staging
+api-gateway:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 4
+
+frontend:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 3
+
+ml-service:
+  replicaCount: 1
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+# Staging database settings
+postgresql:
+  primary:
+    persistence:
+      size: 10Gi
+
+neo4j:
+  volumes:
+    data:
+      defaultStorageClass:
+        requests: 8Gi
+
+kafka:
+  replicaCount: 1
+  persistence:
+    size: 4Gi
+
+# Enable ingress for staging
+ingress:
+  enabled: true
+  hosts:
+    - host: staging.fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: api-gateway
+    
+    - host: api-staging.fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api-gateway
+  
+  tls:
+    - secretName: fraudguard-staging-tls
+      hosts:
+        - staging.fraudguard.yourdomain.com
+        - api-staging.fraudguard.yourdomain.com
+
+adminIngress:
+  enabled: true
+  host: admin-staging.fraudguard.yourdomain.com
+  tls:
+    secretName: fraudguard-admin-staging-tls
+
+# Enable network policies
+networkPolicies:
+  enabled: true

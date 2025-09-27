@@ -442,9 +442,6 @@ const NetworkGraphVisualization: React.FC<Props> = ({
         layout={layoutOptions[layout as keyof typeof layoutOptions]}
         stylesheet={cytoscapeStylesheet}
         cy={handleCyReady}
-        wheelSensitivity={0.2}
-        minZoom={0.1}
-        maxZoom={3}
       />
 
       {/* Selection Info */}

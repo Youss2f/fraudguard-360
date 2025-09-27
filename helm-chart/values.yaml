@@ -1,16 +1,379 @@
-replicaCount: 2
-image:
-  repository: yourregistry/api-gateway
-  tag: latest
-resources:
-  limits:
-    cpu: 2
-    memory: 2Gi
-service:
-  type: ClusterIP
-  port: 8000
-autoscaling:
+# ==============================================================================
+# FraudGuard 360 - Helm Values Configuration
+# Configurable values for all environments (dev, staging, prod)
+# ==============================================================================
+
+# Global Configuration
+global:
+  # Container Registry
+  imageRegistry: ""
+  imagePullSecrets: []
+  
+  # Environment
+  environment: "production"
+  
+  # Monitoring
+  monitoring:
+    enabled: true
+    namespace: monitoring
+  
+  # Security
+  security:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1001
+      fsGroup: 1001
+    networkPolicies:
+      enabled: true
+
+# Namespace Configuration
+namespace:
+  create: true
+  name: fraudguard
+
+# API Gateway Configuration
+api-gateway:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 70
+  replicaCount: 3
+  
+  image:
+    repository: fraudguard/api-gateway
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  config:
+    workers: 4
+    log_level: "INFO"
+    cors_origins: "*"
+
+# Frontend Configuration
+frontend:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: fraudguard/frontend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# ML Service Configuration
+ml-service:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: fraudguard/ml-service
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  
+  # GPU support (if available)
+  gpu:
+    enabled: false
+    type: "nvidia.com/gpu"
+    count: 1
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 85
+
+# Flink Configuration
+flink:
+  enabled: true
+  
+  jobmanager:
+    replicaCount: 1
+    image:
+      repository: flink
+      tag: "1.18-java11"
+    
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    
+    service:
+      type: ClusterIP
+      ports:
+        rpc: 6123
+        ui: 8081
+  
+  taskmanager:
+    replicaCount: 2
+    image:
+      repository: flink
+      tag: "1.18-java11"
+    
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+    
+    config:
+      slots: 4
+
+# Database Dependencies
+postgresql:
+  enabled: true
+  auth:
+    username: fraudguard
+    database: fraudguard
+    # Password will be generated if not provided
+    existingSecret: "fraudguard-postgresql-secret"
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+    
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+neo4j:
+  enabled: true
+  
+  core:
+    numberOfServers: 1
+    
+  config:
+    server.memory.heap.initial_size: "1G"
+    server.memory.heap.max_size: "2G"
+    server.memory.pagecache.size: "1G"
+  
+  volumes:
+    data:
+      mode: "defaultStorageClass"
+      defaultStorageClass:
+        requests: 10Gi
+  
+  services:
+    neo4j:
+      enabled: true
+      ports:
+        bolt: 7687
+        http: 7474
+
+kafka:
+  enabled: true
+  
+  replicaCount: 3
+  
+  # Kafka Configuration
+  config:
+    numPartitions: 6
+    defaultReplicationFactor: 2
+    offsetsTopicReplicationFactor: 3
+    transactionStateLogReplicationFactor: 3
+    transactionStateLogMinIsr: 2
+  
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  
+  # Zookeeper Configuration
+  zookeeper:
+    enabled: true
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 2Gi
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  
+  hosts:
+    - host: fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: api-gateway
+    
+    - host: api.fraudguard.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api-gateway
+  
+  tls:
+    - secretName: fraudguard-tls
+      hosts:
+        - fraudguard.yourdomain.com
+        - api.fraudguard.yourdomain.com
+
+# Admin Ingress (for Flink UI, Neo4j Browser)
+adminIngress:
+  enabled: true
+  className: "nginx"
+  
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: fraudguard-admin-auth
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  
+  host: admin.fraudguard.yourdomain.com
+  
+  paths:
+    - path: /flink
+      service: flink-jobmanager
+      port: 8081
+    - path: /neo4j
+      service: neo4j
+      port: 7474
+  
+  tls:
+    secretName: fraudguard-admin-tls
+
+# Persistence Configuration
+persistence:
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+# Network Policies
+networkPolicies:
+  enabled: true
+  defaultDenyAll: true
+
+# Monitoring & Observability
+monitoring:
+  prometheus:
+    enabled: true
+    scrapeInterval: 30s
+  
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+  
+  jaeger:
+    enabled: false
+
+# Security
+security:
+  podSecurityPolicy:
+    enabled: false
+  
+  rbac:
+    create: true
+  
+  serviceAccount:
+    create: true
+    annotations: {}
+
+# Environment-specific Overrides
+environments:
+  development:
+    global:
+      environment: "development"
+    replicaCount: 1
+    autoscaling:
+      enabled: false
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  staging:
+    global:
+      environment: "staging"
+    replicaCount: 2
+    monitoring:
+      enabled: true
+  
+  production:
+    global:
+      environment: "production"
+    monitoring:
+      enabled: true
+    security:
+      networkPolicies:
+        enabled: true
