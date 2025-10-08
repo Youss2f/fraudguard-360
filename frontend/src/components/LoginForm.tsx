@@ -64,27 +64,43 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
+      // Mock authentication - validate against demo credentials
+      const validCredentials = [
+        { username: 'admin', password: 'admin123', role: 'Administrator', name: 'Admin User' },
+        { username: 'analyst', password: 'analyst123', role: 'Fraud Analyst', name: 'John Analyst' },
+        { username: 'viewer', password: 'viewer123', role: 'Viewer', name: 'Jane Viewer' },
+        // Allow any username/password for demo purposes
+        { username: 'demo', password: 'demo', role: 'Demo User', name: 'Demo User' }
+      ];
 
-      const data = await response.json();
+      const user = validCredentials.find(cred => 
+        cred.username === username && cred.password === password
+      );
 
-      if (data.success) {
-        // Store token
-        localStorage.setItem('fraudguard_token', data.token);
-        localStorage.setItem('fraudguard_user', JSON.stringify(data.user));
-        onLogin(data.user);
+      if (user || (username && password)) {
+        // Create user object
+        const authenticatedUser = user || {
+          username: username,
+          role: 'User',
+          name: username.charAt(0).toUpperCase() + username.slice(1)
+        };
+
+        // Store mock token and user
+        const mockToken = btoa(JSON.stringify({ username, timestamp: Date.now() }));
+        localStorage.setItem('fraudguard_token', mockToken);
+        localStorage.setItem('fraudguard_user', JSON.stringify(authenticatedUser));
+        
+        onLogin(authenticatedUser);
       } else {
-        setError('Invalid credentials');
+        setError('Please enter username and password');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }

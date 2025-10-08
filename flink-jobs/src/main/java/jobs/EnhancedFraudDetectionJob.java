@@ -1,11 +1,18 @@
 package jobs;
 
+import com.fraudguard.flink.ml.MLFraudDetectionFunction;
 import models.CDR;
 import models.FraudAlert;
 import models.FraudStatistics;
 import processors.AdvancedFraudDetectionProcessor;
 import aggregators.FraudStatisticsAggregator;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.streaming.api.datastream.AsyncDataStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
@@ -14,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Enhanced Fraud Detection Job with Real-time Processing

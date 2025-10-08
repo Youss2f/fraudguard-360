@@ -1,0 +1,499 @@
+# FraudGuard 360 - Production CI/CD Pipeline
+# Comprehensive deployment workflow with testing, security scanning, and monitoring
+
+name: Production Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  # Registry Configuration
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  
+  # Application Configuration
+  APP_NAME: fraudguard-360
+  APP_VERSION: ${{ github.sha }}
+  
+  # Deployment Configuration
+  CLUSTER_NAME: fraudguard-production
+  NAMESPACE: fraudguard-360
+  
+  # Security Configuration
+  SONAR_PROJECT_KEY: fraudguard-360
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+jobs:
+  # ==============================================================================
+  # Code Quality and Security Checks
+  # ==============================================================================
+  code-quality:
+    name: Code Quality & Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'openjdk'
+        java-version: '11'
+    
+    # Python Code Quality
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint black isort mypy bandit safety
+        pip install -r api-gateway/requirements.txt
+        pip install -r ml-service/requirements.txt
+    
+    - name: Python Linting
+      run: |
+        pylint api-gateway/app ml-service --exit-zero --output-format=json > pylint-report.json
+        black --check api-gateway/app ml-service || true
+        isort --check-only api-gateway/app ml-service || true
+    
+    - name: Python Type Checking
+      run: |
+        mypy api-gateway/app --ignore-missing-imports || true
+        mypy ml-service --ignore-missing-imports || true
+    
+    - name: Python Security Scan
+      run: |
+        bandit -r api-gateway/app ml-service -f json -o bandit-report.json || true
+        safety check --json --output safety-report.json || true
+    
+    # JavaScript/TypeScript Code Quality
+    - name: Install Frontend Dependencies
+      working-directory: frontend
+      run: npm ci
+    
+    - name: Frontend Linting
+      working-directory: frontend
+      run: |
+        npm run lint
+        npm run type-check
+    
+    # Java Code Quality
+    - name: Java Build and Test
+      working-directory: flink-jobs
+      run: |
+        ./mvnw clean compile
+        ./mvnw test
+        ./mvnw checkstyle:check
+    
+    # SonarCloud Analysis
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+          -Dsonar.organization=${{ github.repository_owner }}
+          -Dsonar.python.coverage.reportPaths=coverage.xml
+          -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+    
+    # Snyk Security Scanning
+    - name: Run Snyk Security Scan
+      uses: snyk/actions/setup@master
+    
+    - name: Snyk Python Dependencies
+      run: snyk test --file=api-gateway/requirements.txt --json > snyk-python-report.json || true
+      continue-on-error: true
+    
+    - name: Snyk Node.js Dependencies
+      working-directory: frontend
+      run: snyk test --json > ../snyk-node-report.json || true
+      continue-on-error: true
+    
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          pylint-report.json
+          bandit-report.json
+          safety-report.json
+          snyk-*-report.json
+
+  # ==============================================================================
+  # Unit and Integration Tests
+  # ==============================================================================
+  test-backend:
+    name: Backend Testing
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_fraudguard
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-asyncio pytest-cov
+        pip install -r api-gateway/requirements.txt
+        pip install -r ml-service/requirements.txt
+    
+    - name: Run API Gateway Tests
+      env:
+        DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_fraudguard
+        REDIS_URL: redis://localhost:6379
+      run: |
+        cd api-gateway
+        pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+    
+    - name: Run ML Service Tests
+      env:
+        DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_fraudguard
+        REDIS_URL: redis://localhost:6379
+      run: |
+        cd ml-service
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+    
+    - name: Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./api-gateway/coverage.xml,./ml-service/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  test-frontend:
+    name: Frontend Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install Dependencies
+      working-directory: frontend
+      run: npm ci
+    
+    - name: Run Unit Tests
+      working-directory: frontend
+      run: npm run test:coverage
+    
+    - name: Upload Coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Start Test Environment
+      run: |
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 30  # Wait for services to start
+    
+    - name: Run Integration Tests
+      run: |
+        python -m pytest tests/integration/ -v --tb=short
+    
+    - name: Run End-to-End Tests
+      run: |
+        cd tests/e2e
+        npm install
+        npm run test:ci
+    
+    - name: Cleanup Test Environment
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # ==============================================================================
+  # Build and Push Docker Images
+  # ==============================================================================
+  build-images:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: [code-quality, test-backend, test-frontend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    
+    strategy:
+      matrix:
+        service:
+          - name: api-gateway
+            context: ./api-gateway
+          - name: ml-service
+            context: ./ml-service
+          - name: frontend
+            context: ./frontend
+          - name: flink-jobs
+            context: ./flink-jobs
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and Push Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.service.context }}
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ==============================================================================
+  # Security Scanning of Images
+  # ==============================================================================
+  security-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    
+    strategy:
+      matrix:
+        service: [api-gateway, ml-service, frontend, flink-jobs]
+    
+    steps:
+    - name: Run Trivy Vulnerability Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+    
+    - name: Upload Trivy Scan Results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+  # ==============================================================================
+  # Deploy to Staging
+  # ==============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v1
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+    
+    - name: Deploy with Helm
+      run: |
+        helm upgrade --install ${{ env.APP_NAME }}-staging ./helm-chart \
+          --namespace ${{ env.NAMESPACE }}-staging \
+          --create-namespace \
+          --values ./helm-chart/values-staging.yaml \
+          --set image.tag=${{ github.sha }} \
+          --set app.version=${{ github.sha }} \
+          --wait --timeout=600s
+    
+    - name: Verify Deployment
+      run: |
+        kubectl rollout status deployment/${{ env.APP_NAME }}-api-gateway -n ${{ env.NAMESPACE }}-staging
+        kubectl rollout status deployment/${{ env.APP_NAME }}-ml-service -n ${{ env.NAMESPACE }}-staging
+        kubectl rollout status deployment/${{ env.APP_NAME }}-frontend -n ${{ env.NAMESPACE }}-staging
+    
+    - name: Run Smoke Tests
+      run: |
+        python tests/smoke/staging_smoke_tests.py
+
+  # ==============================================================================
+  # Deploy to Production
+  # ==============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v1
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    
+    - name: Deploy with Helm
+      run: |
+        helm upgrade --install ${{ env.APP_NAME }} ./helm-chart \
+          --namespace ${{ env.NAMESPACE }} \
+          --create-namespace \
+          --values ./helm-chart/values-production.yaml \
+          --set image.tag=${{ github.sha }} \
+          --set app.version=${{ github.sha }} \
+          --wait --timeout=900s
+    
+    - name: Verify Deployment
+      run: |
+        kubectl rollout status deployment/${{ env.APP_NAME }}-api-gateway -n ${{ env.NAMESPACE }}
+        kubectl rollout status deployment/${{ env.APP_NAME }}-ml-service -n ${{ env.NAMESPACE }}
+        kubectl rollout status deployment/${{ env.APP_NAME }}-frontend -n ${{ env.NAMESPACE }}
+    
+    - name: Run Production Health Checks
+      run: |
+        python tests/smoke/production_health_checks.py
+    
+    - name: Notify Deployment Success
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#deployments'
+        text: |
+          🚀 FraudGuard 360 v${{ github.ref_name }} deployed to production successfully!
+          
+          - Commit: ${{ github.sha }}
+          - Author: ${{ github.actor }}
+          - Duration: ${{ job.duration }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ==============================================================================
+  # Post-Deployment Monitoring
+  # ==============================================================================
+  post-deployment:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Performance Testing
+      run: |
+        # Run performance tests against production
+        docker run --rm \
+          -v ${{ github.workspace }}/tests/performance:/tests \
+          grafana/k6 run /tests/load-test.js \
+          --env BASE_URL=https://api.fraudguard360.com
+    
+    - name: Security Testing
+      run: |
+        # Run OWASP ZAP security scan
+        docker run --rm \
+          -v ${{ github.workspace }}:/zap/wrk/:rw \
+          -t owasp/zap2docker-weekly \
+          zap-baseline.py -t https://fraudguard360.com \
+          -J zap-report.json || true
+    
+    - name: Monitor Deployment Health
+      run: |
+        # Wait and monitor deployment health for 10 minutes
+        python tests/monitoring/deployment_monitor.py \
+          --duration 600 \
+          --prometheus-url https://prometheus.fraudguard360.com
+    
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: post-deployment-results
+        path: |
+          k6-results.json
+          zap-report.json
+          deployment-health.json

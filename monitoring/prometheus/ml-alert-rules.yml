@@ -1,0 +1,235 @@
+# ML Service Alert Rules for FraudGuard 360
+# Monitoring machine learning model performance and service health
+
+groups:
+  - name: ml_service_alerts
+    rules:
+    # ML Service Health
+    - alert: MLServiceDown
+      expr: up{job="fraudguard-ml-service"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: ml-service
+        alert_type: service_health
+      annotations:
+        summary: "ML Service is down"
+        description: "The ML service has been down for more than 1 minute. Fraud detection capabilities are compromised."
+        action: "Check ML service logs and restart if necessary"
+
+    - alert: MLServiceHighLatency
+      expr: ml_prediction_duration_seconds{quantile="0.95"} > 5
+      for: 2m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: performance
+      annotations:
+        summary: "ML Service high prediction latency"
+        description: "95th percentile prediction latency is {{ $value }}s, above 5s threshold"
+        action: "Check ML service performance and consider scaling"
+
+    # Model Performance Alerts
+    - alert: ModelAccuracyDrop
+      expr: ml_model_accuracy < 0.85
+      for: 5m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: model_performance
+      annotations:
+        summary: "ML model accuracy below threshold"
+        description: "Model accuracy is {{ $value }}, below 85% threshold"
+        action: "Review model performance and consider retraining"
+
+    - alert: HighFraudPredictionRate
+      expr: rate(ml_fraud_predictions_total{prediction="fraud"}[5m]) > 0.5
+      for: 3m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: fraud_pattern
+      annotations:
+        summary: "Unusually high fraud prediction rate"
+        description: "Fraud prediction rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+        action: "Investigate potential attack or model drift"
+
+    - alert: ModelPredictionErrors
+      expr: rate(ml_prediction_errors_total[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: model_errors
+      annotations:
+        summary: "High ML model prediction error rate"
+        description: "Model prediction error rate is {{ $value }} errors/sec"
+        action: "Check model input data quality and service logs"
+
+    # Resource Usage Alerts
+    - alert: MLServiceHighCPU
+      expr: ml_service_cpu_usage_percent > 80
+      for: 5m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: resource_usage
+      annotations:
+        summary: "ML Service high CPU usage"
+        description: "ML service CPU usage is {{ $value }}%"
+        action: "Consider scaling ML service or optimizing model inference"
+
+    - alert: MLServiceHighMemory
+      expr: ml_service_memory_usage_percent > 85
+      for: 3m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: resource_usage
+      annotations:
+        summary: "ML Service high memory usage"
+        description: "ML service memory usage is {{ $value }}%"
+        action: "Check for memory leaks and consider scaling"
+
+    # Model Drift Detection
+    - alert: ModelDriftDetected
+      expr: ml_model_drift_score > 0.3
+      for: 10m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: model_drift
+      annotations:
+        summary: "Model drift detected"
+        description: "Model drift score is {{ $value }}, indicating data distribution changes"
+        action: "Schedule model retraining with recent data"
+
+    # Ensemble Model Alerts
+    - alert: EnsembleModelDisagreement
+      expr: ml_ensemble_model_variance > 0.4
+      for: 5m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: ensemble_performance
+      annotations:
+        summary: "High disagreement between ensemble models"
+        description: "Ensemble model variance is {{ $value }}, indicating inconsistent predictions"
+        action: "Review individual model performance and retrain if necessary"
+
+    # Data Quality Alerts
+    - alert: HighMissingFeatureRate
+      expr: ml_missing_features_rate > 0.2
+      for: 5m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: data_quality
+      annotations:
+        summary: "High rate of missing features in ML input"
+        description: "Missing feature rate is {{ $value | humanizePercentage }}"
+        action: "Check data pipeline and feature engineering process"
+
+    - alert: AnomalousFeatureValues
+      expr: ml_anomalous_features_rate > 0.15
+      for: 5m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: data_quality
+      annotations:
+        summary: "High rate of anomalous feature values"
+        description: "Anomalous feature rate is {{ $value | humanizePercentage }}"
+        action: "Validate data sources and preprocessing pipeline"
+
+  - name: fraud_detection_alerts
+    rules:
+    # Critical Fraud Alerts
+    - alert: CriticalFraudDetected
+      expr: increase(ml_critical_fraud_alerts_total[1m]) > 0
+      for: 0s
+      labels:
+        severity: critical
+        service: fraud-detection
+        alert_type: security_incident
+      annotations:
+        summary: "Critical fraud activity detected"
+        description: "{{ $value }} critical fraud alerts in the last minute"
+        action: "Immediate investigation required - potential security incident"
+
+    - alert: FraudSpikeDetected
+      expr: rate(ml_fraud_predictions_total{prediction="fraud"}[1m]) > rate(ml_fraud_predictions_total{prediction="fraud"}[1h] offset 1h) * 3
+      for: 2m
+      labels:
+        severity: warning
+        service: fraud-detection
+        alert_type: fraud_spike
+      annotations:
+        summary: "Fraud detection spike"
+        description: "Fraud detection rate is 3x higher than historical average"
+        action: "Investigate potential coordinated attack or system issues"
+
+    # System Integration Alerts
+    - alert: MLKafkaLag
+      expr: ml_kafka_consumer_lag > 1000
+      for: 2m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: data_pipeline
+      annotations:
+        summary: "High Kafka consumer lag in ML service"
+        description: "ML service Kafka consumer lag is {{ $value }} messages"
+        action: "Check ML service processing capacity and Kafka cluster health"
+
+    - alert: MLRedisConnectionFailure
+      expr: ml_redis_connection_failures_total > 10
+      for: 1m
+      labels:
+        severity: warning
+        service: ml-service
+        alert_type: infrastructure
+      annotations:
+        summary: "ML service Redis connection failures"
+        description: "{{ $value }} Redis connection failures in ML service"
+        action: "Check Redis cluster health and network connectivity"
+
+  - name: ml_training_alerts
+    rules:
+    # Training Pipeline Alerts
+    - alert: ModelTrainingFailure
+      expr: increase(ml_training_failures_total[1h]) > 0
+      for: 0s
+      labels:
+        severity: warning
+        service: ml-training
+        alert_type: training_pipeline
+      annotations:
+        summary: "ML model training failure"
+        description: "Model training pipeline failed {{ $value }} times in the last hour"
+        action: "Check training data quality and infrastructure resources"
+
+    - alert: ModelTrainingStalled
+      expr: time() - ml_last_successful_training_timestamp > 86400
+      for: 1h
+      labels:
+        severity: warning
+        service: ml-training
+        alert_type: training_pipeline
+      annotations:
+        summary: "Model training has not completed in 24 hours"
+        description: "Last successful training was {{ $value | humanizeDuration }} ago"
+        action: "Check training pipeline status and resource availability"
+
+    # Model Validation Alerts
+    - alert: NewModelPerformanceRegression
+      expr: ml_new_model_accuracy < ml_current_model_accuracy - 0.05
+      for: 0s
+      labels:
+        severity: warning
+        service: ml-training
+        alert_type: model_validation
+      annotations:
+        summary: "New model performance regression"
+        description: "New model accuracy ({{ $labels.new_accuracy }}) is significantly lower than current model"
+        action: "Review training data and model configuration before deployment"

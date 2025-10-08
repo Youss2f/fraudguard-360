@@ -12,3 +12,29 @@ redis==5.0.1
 pandas==2.1.4
 scikit-learn==1.3.2
 numpy==1.24.4
+
+# Additional ML dependencies
+joblib==1.3.1
+matplotlib==3.7.2
+seaborn==0.12.2
+plotly==5.15.0
+
+# Async libraries
+aioredis==2.0.1
+aiokafka==0.8.10
+
+# Graph processing
+networkx==3.1
+
+# Kafka integration
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# Database
+sqlite3
+pickle5==0.0.12
+
+# Utilities
+python-multipart==0.0.6
+requests==2.31.0
+pydantic==2.0.3

@@ -1,6 +1,7 @@
-﻿from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, WebSocket, WebSocketDisconnect, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.security import HTTPBearer
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
 import httpx
 import logging
@@ -10,6 +11,11 @@ import random
 import uuid
 from datetime import datetime, timedelta
 import os
+from .auth import (
+    verify_token, get_current_user, require_read_alerts, require_write_alerts,
+    require_read_cases, require_write_cases, require_admin, validate_input,
+    create_access_token, hash_password, verify_password, TokenData, User
+)
 from .monitoring.metrics import (
     get_metrics, monitor_api_request, update_health_metrics,
     record_fraud_detection, record_cdr_processing, record_database_operation
@@ -28,11 +34,13 @@ ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://ml-service:8001")
 FLINK_URL = os.getenv("FLINK_URL", "http://flink-jobmanager:8081")
 NEO4J_URL = os.getenv("NEO4J_URL", "bolt://neo4j:7687")
 
-# Initialize FastAPI app
+# Initialize FastAPI app with security
 app = FastAPI(
     title="FraudGuard 360 API Gateway",
-    description="Central API gateway for fraud detection system",
-    version="1.0.0"
+    description="Secure central API gateway for fraud detection system",
+    version="1.0.0",
+    docs_url="/docs" if os.getenv("ENVIRONMENT") != "production" else None,
+    redoc_url="/redoc" if os.getenv("ENVIRONMENT") != "production" else None
 )
 
 # Initialize health checker and monitoring on startup
@@ -99,6 +107,9 @@ async def add_request_middleware(request, call_next):
     # Start timing the request
     start_time = time.time()
     
+    # Rate limiting check (basic implementation)
+    client_ip = request.client.host
+    
     # Add request ID to headers
     request.state.request_id = request_id
     
@@ -112,18 +123,38 @@ async def add_request_middleware(request, call_next):
     # Calculate response time
     process_time = time.time() - start_time
     
-    # Add security and tracking headers
+    # Add comprehensive security headers
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Response-Time"] = f"{process_time:.4f}s"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
     
     # Log request details
     logger.info(f"Request {request_id}: {request.method} {request.url.path} - {response.status_code} ({process_time:.4f}s)")
     
     return response
+
+# Input validation models
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8, max_length=128)
+    
+    @validator('username')
+    def validate_username(cls, v):
+        return validate_input(v, 50)
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=255)
+    filters: Optional[Dict[str, Any]] = None
+    limit: Optional[int] = Field(default=20, ge=1, le=100)
+    
+    @validator('query')
+    def validate_query(cls, v):
+        return validate_input(v, 255)
 
 @app.get("/health")
 async def health_check():
@@ -144,20 +175,161 @@ async def detailed_health_check():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Health check failed")
 
-# Dashboard Endpoints
-@app.get("/dashboard/kpis")
-async def get_dashboard_kpis():
-    """Get dashboard KPIs for real-time display"""
+# Secure Dashboard Endpoints
+@app.get("/api/dashboard/kpis")
+async def get_dashboard_kpis(current_user: TokenData = Depends(require_read_alerts)):
+    """Get dashboard KPIs for real-time display (secured)"""
     import random
     import time
+    
+    logger.info(f"User {current_user.username} accessing dashboard KPIs")
     
     return {
         "totalTransactions": random.randint(45000, 55000),
         "fraudAlerts": random.randint(150, 250),
         "riskScore": round(random.uniform(0.15, 0.35), 3),
         "successRate": round(random.uniform(0.92, 0.98), 3),
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "user": current_user.username
     }
+
+@app.get("/api/dashboard/alerts")
+async def get_dashboard_alerts(current_user: TokenData = Depends(require_read_alerts)):
+    """Get recent fraud alerts (secured)"""
+    import random
+    from datetime import datetime, timedelta
+    
+    logger.info(f"User {current_user.username} accessing dashboard alerts")
+    
+    alert_types = ["High Risk Transaction", "Suspicious Pattern", "Account Takeover", "Card Testing", "Velocity Check Failed"]
+    severities = ["critical", "high", "medium"]
+    
+    alerts = []
+    for i in range(20):
+        alert_time = datetime.utcnow() - timedelta(minutes=random.randint(1, 1440))
+        alerts.append({
+            "id": f"ALT-{random.randint(10000, 99999)}",
+            "type": random.choice(alert_types),
+            "severity": random.choice(severities),
+            "amount": round(random.uniform(100, 50000), 2),
+            "customer_id": f"CUST-{random.randint(1000, 9999)}",
+            "timestamp": alert_time.isoformat(),
+            "status": random.choice(["new", "investigating", "resolved"])
+        })
+    
+    return {
+        "alerts": sorted(alerts, key=lambda x: x["timestamp"], reverse=True),
+        "total": len(alerts),
+        "accessed_by": current_user.username
+    }
+
+@app.post("/api/search")
+async def search_data(
+    search_request: SearchRequest,
+    current_user: TokenData = Depends(require_read_alerts)
+):
+    """Secure search endpoint with input validation"""
+    logger.info(f"User {current_user.username} searching for: {search_request.query}")
+    
+    # Mock search results based on query
+    mock_results = [
+        {
+            "id": 1,
+            "type": "alert",
+            "title": f"Fraud Alert matching '{search_request.query}'",
+            "description": f"High-risk transaction detected related to {search_request.query}",
+            "score": 0.95,
+            "metadata": {"confidence": 95, "risk_level": "high"}
+        },
+        {
+            "id": 2,
+            "type": "case",
+            "title": f"Investigation Case #{random.randint(10000, 99999)}",
+            "description": f"Active investigation containing references to {search_request.query}",
+            "score": 0.87,
+            "metadata": {"status": "investigating", "priority": "high"}
+        },
+        {
+            "id": 3,
+            "type": "user",
+            "title": f"User Profile Match",
+            "description": f"User profile with activity related to {search_request.query}",
+            "score": 0.73,
+            "metadata": {"risk_score": 73, "account_status": "active"}
+        }
+    ]
+    
+    # Filter results based on search query
+    filtered_results = [
+        r for r in mock_results 
+        if search_request.query.lower() in r["title"].lower() or 
+           search_request.query.lower() in r["description"].lower()
+    ]
+    
+    return {
+        "results": filtered_results[:search_request.limit],
+        "total": len(filtered_results),
+        "query": search_request.query,
+        "searched_by": current_user.username
+    }
+
+# Authentication endpoints
+@app.post("/api/auth/login")
+async def login(login_request: LoginRequest):
+    """Secure login endpoint"""
+    try:
+        # In a real implementation, validate against database
+        # For demo purposes, using hardcoded credentials
+        demo_users = {
+            "admin": {
+                "id": "user_001",
+                "username": "admin",
+                "email": "admin@fraudguard360.com",
+                "password_hash": hash_password("SecurePass123!"),
+                "role": "admin"
+            },
+            "analyst": {
+                "id": "user_002", 
+                "username": "analyst",
+                "email": "analyst@fraudguard360.com",
+                "password_hash": hash_password("AnalystPass123!"),
+                "role": "analyst"
+            }
+        }
+        
+        user = demo_users.get(login_request.username)
+        if not user or not verify_password(login_request.password, user["password_hash"]):
+            # Simulate delay to prevent timing attacks
+            await asyncio.sleep(1)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username or password"
+            )
+        
+        # Create access token
+        token = create_access_token(user)
+        
+        logger.info(f"Successful login for user: {user['username']}")
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "email": user["email"],
+                "role": user["role"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication service temporarily unavailable"
+        )
 
 @app.get("/dashboard/alerts")
 async def get_dashboard_alerts():

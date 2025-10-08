@@ -18,6 +18,8 @@ alerting:
 # Load alerting rules
 rule_files:
   - "/etc/prometheus/alerting-rules.yml"
+  - "/etc/prometheus/ml-alert-rules.yml"
+  - "/etc/prometheus/system-alert-rules.yml"
 
 # Scrape configuration for monitoring targets
 scrape_configs:
@@ -37,13 +39,26 @@ scrape_configs:
     scrape_timeout: 5s
     honor_labels: true
 
-  # ML Service monitoring
+  # ML Service monitoring (enhanced)
   - job_name: 'fraudguard-ml-service'
     static_configs:
-      - targets: ['ml-service:8001']
-    scrape_interval: 15s
+      - targets: ['ml-service:8003']
+    scrape_interval: 5s  # More frequent for ML metrics
     metrics_path: '/metrics'
-    scrape_timeout: 5s
+    scrape_timeout: 10s
+    honor_labels: true
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'ml_.*|fraud_.*|model_.*'
+        action: keep
+
+  # ML Training Pipeline monitoring
+  - job_name: 'fraudguard-ml-training'
+    static_configs:
+      - targets: ['ml-training:8004']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    scrape_timeout: 15s
 
   # Flink Jobs monitoring
   - job_name: 'fraudguard-flink'

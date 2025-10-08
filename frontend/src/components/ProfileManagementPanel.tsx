@@ -39,6 +39,7 @@ import {
   Radio,
   Slider,
   styled,
+  Snackbar,
 } from '@mui/material';
 import {
   Person,
@@ -66,6 +67,7 @@ import {
   School,
 } from '@mui/icons-material';
 import { customColors } from '../theme/enterpriseTheme';
+import { useErrorHandler } from '../utils/errorHandling';
 
 const ProfileCard = styled(Card)(({ theme }) => ({
   backgroundColor: customColors.background.paper,
@@ -96,6 +98,16 @@ interface UserProfile {
   avatar: string;
   joinDate: Date;
   lastLogin: Date;
+}
+
+interface ValidationErrors {
+  [key: string]: string;
+}
+
+interface NotificationState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'warning' | 'info';
 }
 
 interface UserPreferences {
@@ -197,23 +209,45 @@ const ProfileManagementPanel: React.FC<ProfileManagementPanelProps> = ({
   };
 
   const handleSaveProfile = () => {
+    // Validate profile data
+    const errors: ValidationErrors = {};
+    
+    if (!profile.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    }
+    if (!profile.lastName.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+    if (!profile.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(profile.email)) {
+      errors.email = 'Email is invalid';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      console.error('Profile validation errors:', errors);
+      return;
+    }
+
+    // Simulate API call
+    console.log('Saving profile:', profile);
     // In a real app, this would save to the backend
-    alert('Profile saved successfully!');
+    // Show success message
   };
 
   const handleChangePassword = () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Passwords do not match!');
+      console.error('Passwords do not match');
       return;
     }
     
     if (passwordForm.newPassword.length < 8) {
-      alert('Password must be at least 8 characters long!');
+      console.error('Password must be at least 8 characters long');
       return;
     }
     
-    // In a real app, this would validate and change the password
-    alert('Password changed successfully!');
+    // Simulate password change
+    console.log('Password changed successfully');
     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 

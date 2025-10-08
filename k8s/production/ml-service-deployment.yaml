@@ -1,0 +1,359 @@
+# FraudGuard 360 - Enhanced ML Service Deployment
+# Production-ready Kubernetes deployment with auto-scaling and monitoring
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraudguard-ml-service
+  namespace: fraudguard-360
+  labels:
+    app: fraudguard-ml-service
+    component: ml-inference
+    tier: backend
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: fraudguard-ml-service
+  template:
+    metadata:
+      labels:
+        app: fraudguard-ml-service
+        component: ml-inference
+        tier: backend
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8003"
+    spec:
+      serviceAccountName: fraudguard-ml-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: ml-service
+        image: ghcr.io/fraudguard-360/ml-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8003
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: WORKERS
+          value: "4"
+        - name: MAX_REQUESTS
+          value: "1000"
+        - name: MAX_REQUESTS_JITTER
+          value: "100"
+        - name: TIMEOUT_KEEP_ALIVE
+          value: "5"
+        - name: POSTGRES_HOST
+          value: "postgres"
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: postgres-db
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: postgres-password
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: redis-password
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: NEO4J_URI
+          value: "bolt://neo4j:7687"
+        - name: NEO4J_USER
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: neo4j-user
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fraudguard-secrets
+              key: neo4j-password
+        - name: MODEL_CACHE_TTL
+          value: "3600"
+        - name: PREDICTION_BATCH_SIZE
+          value: "100"
+        - name: ASYNC_POOL_SIZE
+          value: "50"
+        - name: PROMETHEUS_MULTIPROC_DIR
+          value: "/tmp/prometheus_multiproc"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+            ephemeral-storage: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+            ephemeral-storage: 2Gi
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/models
+          readOnly: true
+        - name: data-storage
+          mountPath: /app/data
+        - name: cache-storage
+          mountPath: /app/cache
+        - name: tmp-storage
+          mountPath: /tmp
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 2
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 12
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: fraudguard-ml-models
+      - name: data-storage
+        persistentVolumeClaim:
+          claimName: fraudguard-ml-data
+      - name: cache-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp-storage
+        emptyDir:
+          sizeLimit: 512Mi
+      nodeSelector:
+        workload-type: ml-inference
+      tolerations:
+      - key: "ml-inference"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - fraudguard-ml-service
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - compute-optimized
+
+---
+# Service for ML Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraudguard-ml-service
+  namespace: fraudguard-360
+  labels:
+    app: fraudguard-ml-service
+    component: ml-inference
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8003"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8003
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: fraudguard-ml-service
+
+---
+# Horizontal Pod Autoscaler for ML Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fraudguard-ml-service-hpa
+  namespace: fraudguard-360
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fraudguard-ml-service
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: ml_prediction_queue_size
+      target:
+        type: AverageValue
+        averageValue: "50"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fraudguard-ml-service-pdb
+  namespace: fraudguard-360
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: fraudguard-ml-service
+
+---
+# Network Policy for ML Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fraudguard-ml-service-netpol
+  namespace: fraudguard-360
+spec:
+  podSelector:
+    matchLabels:
+      app: fraudguard-ml-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: fraudguard-360
+    - podSelector:
+        matchLabels:
+          app: fraudguard-api-gateway
+    - podSelector:
+        matchLabels:
+          app: fraudguard-flink
+    ports:
+    - protocol: TCP
+      port: 8003
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kafka
+    ports:
+    - protocol: TCP
+      port: 9092
+  - to:
+    - podSelector:
+        matchLabels:
+          app: neo4j
+    ports:
+    - protocol: TCP
+      port: 7687
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
