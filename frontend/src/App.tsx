@@ -54,66 +54,6 @@ const RiskScoring = lazy(() => import('./components/RiskScoring'));
 const TestComponent = lazy(() => import('./components/TestComponent'));
 const SearchResultsModal = lazy(() => import('./components/SearchResultsModal'));
 const NotificationSystem = lazy(() => import('./components/NotificationSystem'));
-const { RevolutionaryModal } = lazy(() => import('./components/InteractiveModals'));
-const { ReportViewer } = lazy(() => import('./components/ReportViewer'));
-const { SchedulingModal } = lazy(() => import('./components/SchedulingModal'));
-
-
-// Sample data generators from ExcelDashboard
-const generateTransactionData = () => {
-  const hours = Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0');
-    return {
-      time: `${hour}:00`,
-      transactions: Math.floor(Math.random() * 1000) + 500,
-      fraudulent: Math.floor(Math.random() * 50) + 10,
-    };
-  });
-  return hours;
-};
-
-const generateRecentAlerts = () => [
-  {
-    id: 1,
-    type: 'Suspicious Transaction',
-    user: 'John Smith',
-    amount: '$2,547.00',
-    location: 'New York, NY',
-    time: '2 min ago',
-    severity: 'high',
-    status: 'investigating',
-  },
-  {
-    id: 2,
-    type: 'Identity Theft',
-    user: 'Sarah Johnson',
-    amount: '$892.50',
-    location: 'Los Angeles, CA',
-    time: '5 min ago',
-    severity: 'medium',
-    status: 'reviewed',
-  },
-  {
-    id: 3,
-    type: 'Card Fraud',
-    user: 'Michael Brown',
-    amount: '$1,234.75',
-    location: 'Chicago, IL',
-    time: '8 min ago',
-    severity: 'high',
-    status: 'blocked',
-  },
-  {
-    id: 4,
-    type: 'Account Takeover',
-    user: 'Emily Davis',
-    amount: '$567.25',
-    location: 'Houston, TX',
-    time: '12 min ago',
-    severity: 'low',
-    status: 'cleared',
-  },
-];
 
 // Loading component
 const LoadingFallback: React.FC<{ message?: string }> = ({ message = "Loading..." }) => (
@@ -154,28 +94,12 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState('dashboard');
-  const [notificationCount, setNotificationCount] = useState(5);
-  const [alertCount, setAlertCount] = useState(12);
+  const [notificationCount] = useState(5);
+  const [alertCount] = useState(12);
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // CONSOLIDATED STATE FROM ExcelDashboard
-  const [transactionData, setTransactionData] = useState(generateTransactionData());
-  const [alerts, setAlerts] = useState(generateRecentAlerts());
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<any>({
-    riskLevel: 'all',
-    dateRange: '7days',
-    amount: [0, 100000],
-    status: [],
-    region: 'all'
-  });
-  const [filteredAlerts, setFilteredAlerts] = useState(generateRecentAlerts());
-  const [filteredTransactionData, setFilteredTransactionData] = useState(generateTransactionData());
-  const [selectedAlert, setSelectedAlert] = useState<any>(null);
-  const [showAdvancedGrid, setShowAdvancedGrid] = useState(false);
-
-  // Panel states (now includes states from ExcelDashboard)
+  // Panel states
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [dataExportOpen, setDataExportOpen] = useState(false);
@@ -192,16 +116,9 @@ function AppContent() {
   const [systemMonitoringOpen, setSystemMonitoringOpen] = useState(false);
   const [alertManagementOpen, setAlertManagementOpen] = useState(false);
   const [investigationViewsOpen, setInvestigationViewsOpen] = useState(false);
-  const [actionsModalOpen, setActionsModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   
-  // New states for reporting
-  const [reportViewerOpen, setReportViewerOpen] = useState(false);
-  const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
-  const [reportData, setReportData] = useState<any[]>([]);
-  const [reportTitle, setReportTitle] = useState('');
-
   // Enhanced state management
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -210,123 +127,215 @@ function AppContent() {
   const [activeSearchModal, setActiveSearchModal] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
 
-  // CONSOLIDATED LOGIC FROM ExcelDashboard
-  const applyFiltersToData = (transData: any[], alertsData: any[], filters: any) => {
-    let filtered = alertsData;
-    if (filters.riskLevel !== 'all') {
-      filtered = filtered.filter((alert: any) => alert.severity === filters.riskLevel);
-    }
-    if (filters.amount) {
-      const amountNum = parseFloat(filters.amount.toString().replace(/[$,]/g, '') || '0');
-      filtered = filtered.filter((alert: any) => {
-        const alertAmount = parseFloat(alert.amount?.replace(/[$,]/g, '') || '0');
-        return alertAmount >= amountNum;
-      });
-    }
-    if (filters.status && filters.status.length > 0) {
-      filtered = filtered.filter((alert: any) => filters.status.includes(alert.status));
-    }
-    setFilteredAlerts(filtered);
-
-    let filteredTrans = transData;
-    if (filters.dateRange !== 'all') {
-      const days = filters.dateRange === '7days' ? 7 : filters.dateRange === '30days' ? 30 : 365;
-      filteredTrans = transData.slice(-days);
-    }
-    setFilteredTransactionData(filteredTrans);
-  };
-
-  const handleFilterApply = (filters: any) => {
-    setAppliedFilters(filters);
-    applyFiltersToData(transactionData, alerts, filters);
-    setFilterPanelOpen(false);
-  };
-
-  const handleExport = (format: string, options: any) => {
-    const exportData = { alerts: filteredAlerts, transactions: filteredTransactionData };
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `fraudguard-export-${Date.now()}.${format === 'excel' ? 'xlsx' : format}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    setDataExportOpen(false);
-  };
-
-  const handleActionExecute = (actionType: string, alertData: any) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertData?.id 
-        ? { ...alert, status: actionType === 'block' ? 'blocked' : actionType === 'resolve' ? 'resolved' : 'investigating' }
-        : alert
-    ));
-    setActionsModalOpen(false);
-  };
-
-  const handleAlertClick = (alertData: any) => {
-    setSelectedAlert(alertData);
-    setActionsModalOpen(true);
-  };
-
-  const handleSchedule = (schedule: any) => {
-    console.log('Scheduled report:', schedule);
-    showNotification(`Report "${schedule.reportType}" scheduled successfully!`, 'success');
-  };
-
   useEffect(() => {
+    // Check for existing authentication
     const token = localStorage.getItem('fraudguard_token');
     const userData = localStorage.getItem('fraudguard_user');
+    
     if (token && userData) {
       setUser(JSON.parse(userData));
       setIsAuthenticated(true);
     }
   }, []);
 
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'F1') { event.preventDefault(); setKeyboardShortcutsOpen(true); }
+      // F1 for help
+      if (event.key === 'F1') {
+        event.preventDefault();
+        setKeyboardShortcutsOpen(true);
+      }
+      
+      // Ctrl+K for global search
       if (event.ctrlKey && event.key === 'k') {
         event.preventDefault();
         const searchTerm = prompt('Enter search term:');
-        if (searchTerm?.trim()) { performSearch(searchTerm.trim()); }
+        if (searchTerm?.trim()) {
+          performSearch(searchTerm.trim());
+        }
+      }
+      
+      // Section navigation shortcuts
+      if (event.ctrlKey && !event.shiftKey) {
+        switch (event.key) {
+          case '1':
+            event.preventDefault();
+            handleSectionChange('dashboard');
+            break;
+          case '2':
+            event.preventDefault();
+            handleSectionChange('investigations');
+            break;
+          case '3':
+            event.preventDefault();
+            handleSectionChange('reports');
+            break;
+          case '4':
+            event.preventDefault();
+            handleSectionChange('settings');
+            break;
+        }
       }
     };
-    if (isAuthenticated) { window.addEventListener('keydown', handleGlobalKeyDown); }
-    return () => { window.removeEventListener('keydown', handleGlobalKeyDown); };
+
+    if (isAuthenticated) {
+      window.addEventListener('keydown', handleGlobalKeyDown);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
   }, [isAuthenticated]);
 
+  // Enhanced utility functions
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const notification = { id: Date.now(), message, type, timestamp: new Date().toISOString() };
-    setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+    const notification = {
+      id: Date.now(),
+      message,
+      type,
+      timestamp: new Date().toISOString()
+    };
+    setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Keep last 10
+    
+    // Auto-remove after 5 seconds
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== notification.id));
     }, 5000);
   };
 
-  const performSearch = async (searchTerm: string) => { /* ... existing search logic ... */ };
+  const performSearch = async (searchTerm: string) => {
+    if (!searchTerm.trim()) return;
+    
+    setIsLoading(true);
+    setSearchQuery(searchTerm);
+    
+    try {
+      // Mock search results with comprehensive data
+      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
+      
+      const mockAlerts = [
+        { id: 1, type: 'alert', title: `High-Risk Transaction Alert`, content: `Suspicious $5,000 transaction from ${searchTerm}`, score: 0.95, severity: 'critical', timestamp: new Date(Date.now() - 5 * 60 * 1000) },
+        { id: 2, type: 'alert', title: `Identity Verification Failed`, content: `Multiple failed login attempts for user ${searchTerm}`, score: 0.87, severity: 'high', timestamp: new Date(Date.now() - 15 * 60 * 1000) },
+        { id: 3, type: 'alert', title: `Card Fraud Detection`, content: `Unusual spending pattern detected for ${searchTerm}`, score: 0.73, severity: 'medium', timestamp: new Date(Date.now() - 30 * 60 * 1000) }
+      ];
 
-  const refreshDashboardData = async () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      const newTransactionData = generateTransactionData();
-      const newAlerts = generateRecentAlerts();
-      setTransactionData(newTransactionData);
-      setAlerts(newAlerts);
-      applyFiltersToData(newTransactionData, newAlerts, appliedFilters);
-      setIsRefreshing(false);
-      showNotification('Dashboard data refreshed successfully!', 'success');
-    }, 1000);
+      const mockTransactions = [
+        { id: 4, type: 'transaction', title: `Transaction #TX-${Math.floor(Math.random() * 10000)}`, content: `Payment of $${(Math.random() * 1000 + 100).toFixed(2)} by ${searchTerm}`, score: 0.82, amount: Math.random() * 1000 + 100, status: 'completed' },
+        { id: 5, type: 'transaction', title: `Transfer #TF-${Math.floor(Math.random() * 10000)}`, content: `Bank transfer involving ${searchTerm}`, score: 0.69, amount: Math.random() * 5000 + 500, status: 'pending' },
+        { id: 6, type: 'transaction', title: `Refund #RF-${Math.floor(Math.random() * 10000)}`, content: `Refund processed for ${searchTerm}`, score: 0.51, amount: Math.random() * 200 + 50, status: 'completed' }
+      ];
+
+      const mockUsers = [
+        { id: 7, type: 'user', title: `User Profile: ${searchTerm}`, content: `Account details and activity history for ${searchTerm}`, score: 0.91, riskLevel: 'medium', joinDate: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+        { id: 8, type: 'user', title: `Related Account: ${searchTerm.split(' ')[0]}`, content: `Linked account with similar patterns to ${searchTerm}`, score: 0.65, riskLevel: 'low', joinDate: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000) }
+      ];
+
+      const mockCases = [
+        { id: 9, type: 'case', title: `Investigation Case #C-${Math.floor(Math.random() * 1000)}`, content: `Active fraud investigation involving ${searchTerm}`, score: 0.88, status: 'active', priority: 'high' },
+        { id: 10, type: 'case', title: `Closed Case #C-${Math.floor(Math.random() * 1000)}`, content: `Resolved fraud case related to ${searchTerm}`, score: 0.76, status: 'closed', priority: 'medium' }
+      ];
+
+      // Filter results based on search term
+      const allResults = [...mockAlerts, ...mockTransactions, ...mockUsers, ...mockCases];
+      const filteredResults = allResults.filter(item => 
+        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.content.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      // Sort by relevance score
+      const sortedResults = filteredResults.sort((a, b) => b.score - a.score);
+      
+      setSearchResults(sortedResults);
+      setActiveSearchModal(true);
+      showNotification(`Found ${sortedResults.length} results for "${searchTerm}"`, 'success');
+    } catch (error) {
+      console.error('Search error:', error);
+      showNotification('Search failed. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const saveDashboardState = () => { /* ... existing save logic ... */ };
+  const refreshDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate new mock dashboard data
+      const newDashboardData = {
+        totalTransactions: Math.floor(Math.random() * 10000) + 50000,
+        fraudDetected: Math.floor(Math.random() * 100) + 247,
+        totalUsers: Math.floor(Math.random() * 1000) + 15000,
+        systemHealth: Math.floor(Math.random() * 20) + 80,
+        activeAlerts: Math.floor(Math.random() * 20) + 5,
+        recentActivity: [
+          { type: 'transaction', message: 'High-value transaction processed', timestamp: new Date() },
+          { type: 'alert', message: 'New fraud pattern detected', timestamp: new Date(Date.now() - 5 * 60 * 1000) },
+          { type: 'user', message: 'New user registered', timestamp: new Date(Date.now() - 10 * 60 * 1000) }
+        ]
+      };
+      
+      setDashboardData(newDashboardData);
+      setLastUpdate(new Date());
+      showNotification('Dashboard data refreshed successfully!', 'success');
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setLastUpdate(new Date());
+      showNotification('Refresh completed with cached data', 'info');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  const saveDashboardState = () => {
+    try {
+      const state = {
+        currentSection,
+        timestamp: new Date().toISOString(),
+        user: user?.username,
+        preferences: {
+          zoomLevel,
+          openPanels: {
+            filterPanelOpen,
+            viewOptionsOpen,
+            notificationsPanelOpen
+          }
+        }
+      };
+      
+      localStorage.setItem('fraudguard_dashboard_state', JSON.stringify(state));
+      showNotification('Dashboard state saved successfully!', 'success');
+    } catch (error) {
+      console.error('Save error:', error);
+      showNotification('Failed to save dashboard state', 'error');
+    }
+  };
+
+  // Update current section based on URL and page title
   useEffect(() => {
     const path = location.pathname.split('/')[1] || 'dashboard';
     setCurrentSection(path);
-    document.title = `${path.charAt(0).toUpperCase() + path.slice(1)} - FraudGuard 360`;
+    
+    // Update page title based on current route
+    const pageTitles: { [key: string]: string } = {
+      'dashboard': 'Dashboard - FraudGuard 360',
+      'real-time-monitoring': 'Real-time Monitoring - FraudGuard 360',
+      'alerts': 'Alerts & Warnings - FraudGuard 360',
+      'investigations': 'Investigations - FraudGuard 360',
+      'fraud-patterns': 'Fraud Patterns - FraudGuard 360',
+      'network-analysis': 'Network Analysis - FraudGuard 360',
+      'risk-scoring': 'Risk Scoring - FraudGuard 360',
+      'data-sources': 'Data Sources - FraudGuard 360',
+      'data-quality': 'Data Quality - FraudGuard 360',
+      'reports': 'Reports - FraudGuard 360',
+      'users': 'User Management - FraudGuard 360',
+      'permissions': 'Permissions - FraudGuard 360',
+      'settings': 'Settings - FraudGuard 360',
+    };
+    
+    document.title = pageTitles[path] || 'FraudGuard 360 - Professional Fraud Detection';
   }, [location]);
 
   const handleSectionChange = (section: string) => {
@@ -346,55 +355,202 @@ function AppContent() {
     setIsAuthenticated(false);
   };
 
-  // MASTER ACTION HANDLER
-  const handleActionClick = (action: string, data?: any) => {
-    console.log('Action clicked:', action, data);
+  const handleActionClick = (action: string) => {
+    console.log('Action clicked:', action);
+    
+    // Handle various ribbon and quick access actions with real implementations
     switch (action) {
-      case 'refresh': refreshDashboardData(); break;
-      case 'filter': setFilterPanelOpen(true); break;
-      case 'view': setViewOptionsOpen(true); break;
-      case 'timeline': setTimelineViewOpen(true); break;
-      case 'reports': setReportsPanelOpen(true); break;
-      case 'export': setDataExportOpen(true); break;
-      case 'investigate': setInvestigationViewsOpen(true); break;
-      case 'share': setShareDashboardOpen(true); break;
-      case 'print': window.print(); break;
-      case 'search': const term = prompt('Enter search term:'); if (term) performSearch(term); break;
-      case 'assign': case 'escalate': case 'close': setCaseManagementOpen(true); break;
-      case 'manage-users': case 'roles': case 'permissions': case 'settings': setAdminPanelOpen(true); break;
-      case 'monitoring': case 'logs': setSystemMonitoringOpen(true); break;
-      case 'notifications': setNotificationsPanelOpen(true); break;
-      case 'profile': setProfileManagementOpen(true); break;
-      case 'help': setKeyboardShortcutsOpen(true); break;
-      case 'logout': handleLogout(); break;
-      case 'alertClick': handleAlertClick(data); break;
-      case 'showAdvancedGrid': setShowAdvancedGrid(data); break;
+      // Dashboard actions
+      case 'save':
+        saveDashboardState();
+        break;
+        
+      case 'refresh':
+        refreshDashboardData();
+        break;
+        
+      case 'filter':
+        setFilterPanelOpen(true);
+        break;
+        
+      case 'view':
+        setViewOptionsOpen(true);
+        break;
+        
+      case 'timeline':
+        setTimelineViewOpen(true);
+        break;
+        
+      case 'reports':
+        setReportsPanelOpen(true);
+        break;
+        
+      case 'export':
+        setAdvancedExportOpen(true);
+        break;
+        
+      case 'investigate':
+        setInvestigationViewsOpen(true);
+        break;
+        
+      case 'search':
+        // Enhanced global search functionality
+        const searchTerm = prompt('Enter search term:');
+        if (searchTerm?.trim()) {
+          performSearch(searchTerm.trim());
+        }
+        break;
+        
+      case 'share':
+        setShareDashboardOpen(true);
+        break;
+        
+      case 'print':
+        try {
+          window.print();
+          showNotification('Print dialog opened', 'info');
+        } catch (error) {
+          showNotification('Print failed. Please try again.', 'error');
+        }
+        break;
+        
+      // Investigation actions
+      case 'expand':
+        setInvestigationViewsOpen(true);
+        showNotification('Opening investigation views...', 'info');
+        break;
+        
+      case 'patterns':
+        setInvestigationViewsOpen(true);
+        showNotification('Loading fraud pattern analysis...', 'info');
+        break;
+        
+      case 'assign':
+        setAlertManagementOpen(true);
+        showNotification('Opening case assignment panel...', 'info');
+        break;
+        
+      case 'escalate':
+        setCaseManagementOpen(true);
+        showNotification('Opening case escalation...', 'info');
+        break;
+        
+      case 'close':
+        setCaseManagementOpen(true);
+        showNotification('Opening case closure workflow...', 'info');
+        break;
+        
+      case 'export-case':
+        setCaseManagementOpen(true);
+        showNotification('Preparing case export...', 'info');
+        break;
+        
+      case 'report':
+        setReportsPanelOpen(true);
+        showNotification('Loading report generator...', 'info');
+        break;
+        
+      case 'share-case':
+        setCaseManagementOpen(true);
+        showNotification('Opening case sharing options...', 'info');
+        break;
+        
+      // Reports actions
       case 'daily':
-        setReportTitle('Daily Fraud Report');
-        setReportData(alerts.slice(0, 10)); // Show top 10 alerts for daily report
-        setReportViewerOpen(true);
+        setReportsPanelOpen(true);
+        showNotification('Generating daily report...', 'info');
         break;
+        
       case 'weekly':
-        setReportTitle('Weekly Fraud Summary');
-        setReportData(transactionData.slice(0, 7).map(d => ({ day: d.time, ...d }))); // Show last 7 days of transactions
-        setReportViewerOpen(true);
+        setReportsPanelOpen(true);
+        showNotification('Generating weekly report...', 'info');
         break;
+        
       case 'custom':
-        setReportTitle('Custom Report Builder');
-        setReportData(alerts); // Show all alerts for custom report
-        setReportViewerOpen(true);
+        setReportsPanelOpen(true);
+        showNotification('Opening custom report builder...', 'info');
         break;
-      case 'add-schedule':
-        setSchedulingModalOpen(true);
+        
+      case 'pdf':
+        setAdvancedExportOpen(true);
+        showNotification('Preparing PDF export...', 'info');
         break;
+        
+      case 'excel':
+        setAdvancedExportOpen(true);
+        showNotification('Preparing Excel export...', 'info');
+        break;
+        
+      case 'email':
+        setAdvancedExportOpen(true);
+        showNotification('Opening email delivery options...', 'info');
+        break;
+        
+      // Admin actions
+      case 'manage-users':
+        setAdminPanelOpen(true);
+        showNotification('Loading user management...', 'info');
+        break;
+        
+      case 'roles':
+        setAdminPanelOpen(true);
+        showNotification('Loading role management...', 'info');
+        break;
+        
+      case 'permissions':
+        setAdminPanelOpen(true);
+        showNotification('Loading permission settings...', 'info');
+        break;
+        
+      case 'settings':
+        setAdminPanelOpen(true);
+        showNotification('Opening system settings...', 'info');
+        break;
+        
+      case 'monitoring':
+        setSystemMonitoringOpen(true);
+        showNotification('Loading system monitoring...', 'info');
+        break;
+        
+      case 'logs':
+        setSystemMonitoringOpen(true);
+        showNotification('Loading system logs...', 'info');
+        break;
+        
+      // User actions
+      case 'notifications':
+        setNotificationsPanelOpen(true);
+        break;
+        
+      case 'profile':
+        setProfileManagementOpen(true);
+        showNotification('Loading profile settings...', 'info');
+        break;
+        
+      case 'help':
+        setKeyboardShortcutsOpen(true);
+        break;
+        
+      case 'logout':
+        handleLogout();
+        showNotification('Logged out successfully', 'success');
+        break;
+        
       default:
         console.log('Unhandled action:', action);
         showNotification(`Feature "${action}" is being prepared for release`, 'info');
     }
   };
 
+
+
+  // Show login form if not authenticated
   if (!isAuthenticated) {
-    return <Suspense fallback={<LoadingFallback />}><LoginForm onLogin={handleLogin} /></Suspense>;
+    return (
+      <Suspense fallback={<LoadingFallback message="Loading login..." />}>
+        <LoginForm onLogin={handleLogin} />
+      </Suspense>
+    );
   }
 
   const renderContent = () => {
@@ -402,32 +558,99 @@ function AppContent() {
       case 'dashboard':
         return (
           <Suspense fallback={<LoadingFallback message="Loading dashboard..." />}>
-            <ExcelDashboard 
-              transactionData={filteredTransactionData}
-              alerts={filteredAlerts}
-              isRefreshing={isRefreshing}
-              onRefresh={refreshDashboardData}
-              onFilter={() => handleActionClick('filter')}
-              onExport={() => handleActionClick('export')}
-              onAlertClick={(alert) => handleActionClick('alertClick', alert)}
-              onShowAdvancedGrid={setShowAdvancedGrid}
+            <ExcelDashboard />
+          </Suspense>
+        );
+      case 'monitoring':
+      case 'live-alerts':
+      case 'network-activity':
+      case 'system-health':
+      case 'real-time-monitoring':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading monitoring..." />}>
+            <ExcelRealTimeMonitoring />
+          </Suspense>
+        );
+      case 'fraud-detection':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading fraud detection..." />}>
+            <ExcelFraudDetection />
+          </Suspense>
+        );
+      case 'analytics':
+      case 'investigations':
+      case 'fraud-patterns':
+      case 'network-analysis':
+      case 'risk-scoring':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading analytics..." />}>
+            <ExcelAnalytics />
+          </Suspense>
+        );
+      case 'data-sources':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading data sources..." />}>
+            <PlaceholderPage
+              title="Data Sources"
+              description="Manage and configure data sources, connections, and integration pipelines."
+              features={['Source Configuration', 'Data Connectors', 'Pipeline Management', 'Data Quality Checks']}
             />
           </Suspense>
         );
-      // ... other cases from original App.tsx
+      case 'data-quality':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading data quality..." />}>
+            <PlaceholderPage
+              title="Data Quality"
+              description="Monitor and maintain data quality with automated validation and cleansing processes."
+              features={['Quality Metrics', 'Data Validation', 'Cleansing Rules', 'Quality Reports']}
+            />
+          </Suspense>
+        );
+      case 'reports':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading reports..." />}>
+            <ExcelReports />
+          </Suspense>
+        );
+      case 'users':
+      case 'user-management':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading user management..." />}>
+            <PlaceholderPage
+              title="User Management"
+              description="Manage user accounts, access levels, and authentication settings."
+              features={['User Accounts', 'Role Management', 'Access Control', 'Activity Tracking']}
+            />
+          </Suspense>
+        );
+      case 'permissions':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading permissions..." />}>
+            <PlaceholderPage
+              title="Permissions & Access Control"
+              description="Configure detailed permissions and access controls for system security."
+              features={['Role-based Access', 'Feature Permissions', 'Data Access Rules', 'Audit Logs']}
+            />
+          </Suspense>
+        );
+      case 'settings':
+      case 'system-settings':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading settings..." />}>
+            <Settings />
+          </Suspense>
+        );
+      case 'test':
+        return (
+          <Suspense fallback={<LoadingFallback message="Loading test component..." />}>
+            <TestComponent />
+          </Suspense>
+        );
       default:
         return (
           <Suspense fallback={<LoadingFallback message="Loading dashboard..." />}>
-            <ExcelDashboard 
-              transactionData={filteredTransactionData}
-              alerts={filteredAlerts}
-              isRefreshing={isRefreshing}
-              onRefresh={refreshDashboardData}
-              onFilter={() => handleActionClick('filter')}
-              onExport={() => handleActionClick('export')}
-              onAlertClick={(alert) => handleActionClick('alertClick', alert)}
-              onShowAdvancedGrid={setShowAdvancedGrid}
-            />
+            <ExcelDashboard />
           </Suspense>
         );
     }
@@ -437,68 +660,122 @@ function AppContent() {
     <Suspense fallback={<LoadingFallback message="Loading FraudGuard 360..." />}>
       <ExcelLayout
         activeSection={currentSection}
-        onSectionChange={handleSectionChange}
+        onSectionChange={setCurrentSection}
         notificationCount={notificationCount}
         alertCount={alertCount}
         userRole={user?.role || 'Analyst'}
         userName={user?.username || 'John Doe'}
         onLogout={handleLogout}
-        onSettings={() => handleActionClick('settings')}
-        onNotifications={() => handleActionClick('notifications')}
-        onActionClick={handleActionClick}
-        currentTab={currentSection}
+        onSettings={() => setCurrentSection('settings')}
+        onNotifications={() => setNotificationsPanelOpen(true)}
       >
         {renderContent()}
         
-        {/* MODALS - Now controlled by App.tsx state */}
-        <Suspense fallback={<div />}>
-          <RevolutionaryModal
+        {/* Feature Panels */}
+          <FilterPanel
             open={filterPanelOpen}
             onClose={() => setFilterPanelOpen(false)}
-            title="Advanced Fraud Filters"
-            type="filter"
-            onApplyFilter={handleFilterApply}
+            onApplyFilters={(filters) => {
+              console.log('Applied filters:', filters);
+              // Here you would apply the filters to your data
+            }}
           />
-          <RevolutionaryModal
+          
+          <ViewOptionsPanel
+            open={viewOptionsOpen}
+            onClose={() => setViewOptionsOpen(false)}
+            onApplyView={(viewOptions) => {
+              console.log('Applied view options:', viewOptions);
+              // Here you would apply the view settings
+            }}
+          />
+          
+          <DataExportPanel
             open={dataExportOpen}
             onClose={() => setDataExportOpen(false)}
-            title="Export Dashboard Data"
-            type="export"
-            onExportData={handleExport}
+              exportType={currentSection as any}
           />
-          <RevolutionaryModal
-            open={actionsModalOpen}
-            onClose={() => setActionsModalOpen(false)}
-            title="Fraud Investigation Actions"
-            type="actions"
-            data={selectedAlert}
-            onActionExecute={handleActionExecute}
-          />
+          
           <NotificationsPanel
             open={notificationsPanelOpen}
             onClose={() => setNotificationsPanelOpen(false)}
             notificationCount={notificationCount}
           />
+          
+          <InvestigationToolsPanel
+            open={investigationToolsPanelOpen}
+            onClose={() => setInvestigationToolsPanelOpen(false)}
+          />
+          
+          <AdminPanel
+            open={adminPanelOpen}
+            onClose={() => setAdminPanelOpen(false)}
+          />
+          
           <ReportsPanel
             open={reportsPanelOpen}
             onClose={() => setReportsPanelOpen(false)}
-            onActionClick={handleActionClick}
           />
-          <ReportViewer
-            open={reportViewerOpen}
-            onClose={() => setReportViewerOpen(false)}
-            title={reportTitle}
-            data={reportData}
-            onPrint={() => window.print()}
-            onExport={() => handleExport('csv', {})}
+          
+          <TimelineViewPanel
+            open={timelineViewOpen}
+            onClose={() => setTimelineViewOpen(false)}
           />
-          <SchedulingModal
-            open={schedulingModalOpen}
-            onClose={() => setSchedulingModalOpen(false)}
-            onSchedule={handleSchedule}
+          
+          <ShareDashboardPanel
+            open={shareDashboardOpen}
+            onClose={() => setShareDashboardOpen(false)}
           />
-        </Suspense>
-        
+          
+          <ProfileManagementPanel
+            open={profileManagementOpen}
+            onClose={() => setProfileManagementOpen(false)}
+          />
+          
+          <KeyboardShortcutsDialog
+            open={keyboardShortcutsOpen}
+            onClose={() => setKeyboardShortcutsOpen(false)}
+          />
+          
+          <CaseManagementPanel
+            open={caseManagementOpen}
+            onClose={() => setCaseManagementOpen(false)}
+          />
+          
+          <AdvancedExportSystem
+            open={advancedExportOpen}
+            onClose={() => setAdvancedExportOpen(false)}
+          />
+          
+          <SystemMonitoringPanel
+            open={systemMonitoringOpen}
+            onClose={() => setSystemMonitoringOpen(false)}
+          />
+          
+          <AlertManagementSystem
+            open={alertManagementOpen}
+            onClose={() => setAlertManagementOpen(false)}
+          />
+          
+          <InvestigationViews
+            open={investigationViewsOpen}
+            onClose={() => setInvestigationViewsOpen(false)}
+          />
+          
+          {/* Enhanced Components */}
+          <SearchResultsModal
+            open={activeSearchModal}
+            onClose={() => setActiveSearchModal(false)}
+            results={searchResults}
+            query={searchQuery}
+            loading={isLoading && searchQuery !== ''}
+          />
+          
+          <NotificationSystem
+            notifications={notifications}
+            onClose={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
+          />
+          
       </ExcelLayout>
     </Suspense>
   );

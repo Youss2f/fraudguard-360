@@ -1,0 +1,494 @@
+name: FraudGuard 360° CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  JAVA_VERSION: '17'
+
+jobs:
+  # Security and Quality Checks
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Frontend Build and Test
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint --if-present
+
+      - name: Run Prettier check
+        run: npm run format:check --if-present
+
+      - name: Run tests
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./frontend/coverage/lcov.info
+          flags: frontend
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: ./frontend/build/
+
+  # Python Services (AI, Graph, API Gateway)
+  python-services-ci:
+    name: Python Services CI
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ai-service, graph-service, api-gateway]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.service }}-${{ hashFiles(format('./services/{0}/requirements.txt', matrix.service)) }}
+
+      - name: Install dependencies
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio black flake8 mypy
+
+      - name: Code formatting check (Black)
+        working-directory: ./services/${{ matrix.service }}
+        run: black --check .
+
+      - name: Lint with flake8
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Type checking with mypy
+        working-directory: ./services/${{ matrix.service }}
+        run: mypy . --ignore-missing-imports || true
+
+      - name: Run tests
+        working-directory: ./services/${{ matrix.service }}
+        run: pytest --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./services/${{ matrix.service }}/coverage.xml
+          flags: ${{ matrix.service }}
+
+  # Java Processing Service
+  java-service-ci:
+    name: Java Processing Service CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/processing-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('./services/processing-service/pom.xml') }}
+
+      - name: Run tests
+        run: mvn clean test
+
+      - name: Generate test report
+        run: mvn surefire-report:report
+
+      - name: Code coverage
+        run: mvn jacoco:report
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./services/processing-service/target/site/jacoco/jacoco.xml
+          flags: processing-service
+
+      - name: Build JAR
+        run: mvn clean package -DskipTests
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: processing-service-jar
+          path: ./services/processing-service/target/*.jar
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [frontend-ci, python-services-ci, java-service-ci]
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: fraudguard360
+          POSTGRES_DB: fraudguard_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7.2-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/fraudguard360
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p fraudguard360 'RETURN 1'"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 3
+        ports:
+          - 7474:7474
+          - 7687:7687
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+
+      - name: Wait for services
+        run: |
+          sleep 30
+
+      - name: Run integration tests
+        run: |
+          python -m pytest tests/integration/ -v
+        env:
+          POSTGRES_URL: postgresql://postgres:fraudguard360@localhost:5432/fraudguard_test
+          REDIS_URL: redis://localhost:6379
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: fraudguard360
+
+  # Build and Push Docker Images
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [security-scan, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    strategy:
+      matrix:
+        service: 
+          - ai-service
+          - graph-service
+          - api-gateway
+          - processing-service
+          - frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Download build artifacts (if frontend)
+        if: matrix.service == 'frontend'
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: ./frontend/build/
+
+      - name: Download JAR artifact (if processing-service)
+        if: matrix.service == 'processing-service'
+        uses: actions/download-artifact@v3
+        with:
+          name: processing-service-jar
+          path: ./services/processing-service/target/
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'frontend' && './frontend' || format('./services/{0}', matrix.service) }}
+          file: ${{ matrix.service == 'frontend' && './frontend/Dockerfile' || format('./services/{0}/Dockerfile', matrix.service) }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to staging
+        run: |
+          # Update image tags in Kubernetes manifests
+          sed -i "s|IMAGE_TAG|sha-${{ github.sha }}|g" k8s/overlays/staging/*.yaml
+          
+          # Apply manifests
+          kubectl apply -k k8s/overlays/staging/
+          
+          # Wait for rollout
+          kubectl rollout status deployment/api-gateway -n fraudguard-staging
+          kubectl rollout status deployment/ai-service -n fraudguard-staging
+          kubectl rollout status deployment/graph-service -n fraudguard-staging
+
+      - name: Run smoke tests
+        run: |
+          # Wait for services to be ready
+          sleep 60
+          
+          # Run basic health checks
+          python tests/smoke/health_check.py --environment staging
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install load testing tools
+        run: |
+          pip install locust httpx
+
+      - name: Run performance tests
+        run: |
+          cd tests/performance
+          locust --headless --users 100 --spawn-rate 10 --run-time 5m --host ${{ secrets.STAGING_URL }}
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: tests/performance/results/
+
+  # Security Tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: ${{ secrets.STAGING_URL }}
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [performance-tests, security-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to production
+        run: |
+          # Update image tags in Kubernetes manifests
+          sed -i "s|IMAGE_TAG|sha-${{ github.sha }}|g" k8s/overlays/production/*.yaml
+          
+          # Apply manifests with blue-green deployment
+          kubectl apply -k k8s/overlays/production/
+          
+          # Wait for rollout
+          kubectl rollout status deployment/api-gateway -n fraudguard-production
+          kubectl rollout status deployment/ai-service -n fraudguard-production
+          kubectl rollout status deployment/graph-service -n fraudguard-production
+
+      - name: Run production smoke tests
+        run: |
+          sleep 60
+          python tests/smoke/health_check.py --environment production
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          message: |
+            🚀 FraudGuard 360° deployed to production successfully!
+            
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Branch: ${{ github.ref }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+
+    steps:
+      - name: Delete old container images
+        run: |
+          # Keep only the last 10 versions of each service
+          echo "Cleanup would be implemented here for old container images"
+
+      - name: Update deployment status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: '${{ job.status }}',
+              description: 'Deployment finished',
+              environment_url: '${{ secrets.PRODUCTION_URL }}'
+            })
