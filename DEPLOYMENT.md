@@ -1,33 +1,45 @@
-# FraudGuard 360 - Deployment Guide
+# 🚀 FraudGuard 360° Deployment Guide
 
-## Overview
+This comprehensive guide provides step-by-step instructions for deploying FraudGuard 360° across various environments, from local development to enterprise production deployments.
 
-This guide covers deploying the FraudGuard 360 fraud detection platform using Kubernetes and Helm. The platform supports multiple deployment environments with progressive deployment strategies.
+## 📋 **Prerequisites**
 
-## Architecture
+### **System Requirements**
 
-### Microservices Components
-- **API Gateway**: Central authentication and routing (FastAPI)
+#### **Minimum Hardware**
+- **CPU**: 8 cores (4 cores minimum)
+- **RAM**: 16GB (8GB minimum)
+- **Storage**: 100GB SSD
+- **Network**: 1Gbps bandwidth
+
+#### **Recommended Hardware (Production)**
+- **CPU**: 16+ cores
+- **RAM**: 32GB+
+- **Storage**: 500GB+ NVMe SSD
+- **Network**: 10Gbps bandwidth
+
+#### **Software Dependencies**
+- **Docker**: 24.0+
+- **Docker Compose**: 2.20+
+- **Kubernetes**: 1.28+ (for production)
+- **Helm**: 3.12+ (for Kubernetes deployment)
+
+## 🏗️ **Architecture Overview**
+
+### **Microservices Components**
+- **API Gateway**: Central authentication and routing (FastAPI + JWT)
 - **Frontend**: React TypeScript dashboard with real-time analytics
-- **ML Service**: Machine learning inference service with GraphSAGE
-- **Flink Jobs**: Real-time stream processing for fraud detection
-- **PostgreSQL**: Relational data storage
-- **Neo4j**: Graph database for relationship analysis
-- **Apache Kafka**: Message streaming and event processing
+- **Processing Service**: Apache Flink real-time stream processing (Java)
+- **AI Service**: GraphSAGE neural network inference (Python/PyTorch)
+- **Graph Service**: Neo4j graph analytics and pattern detection
+- **Alerting Service**: Kafka-based alert processing and notifications
 
-### Infrastructure
-- **Kubernetes**: Container orchestration (v1.18+)
-- **Helm**: Package management and templating (v3.13+)
-- **NGINX Ingress**: External access and SSL termination
-- **Prometheus & Grafana**: Monitoring and observability
-
-## Prerequisites
-
-### Kubernetes Cluster
-```bash
-# Minimum requirements:
-# - Kubernetes 1.18+
-# - 16 vCPUs, 32GB RAM for production
+### **Infrastructure Services**
+- **PostgreSQL 15**: Transactional data storage
+- **Neo4j 5.15**: Graph database for relationship analysis
+- **Apache Kafka**: Event streaming and microservices communication
+- **Redis 7.2**: High-performance caching layer
+- **Prometheus + Grafana**: Monitoring and observability stack
 # - 100GB+ storage with dynamic provisioning
 # - LoadBalancer support for ingress
 
