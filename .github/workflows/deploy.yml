@@ -1,8 +1,8 @@
-name: Deploy
+name: Enterprise Deployment
 
 on:
   workflow_run:
-    workflows: ["CI Pipeline"]
+    workflows: ["Enterprise Production Pipeline"]
     types:
       - completed
     branches: [main]

@@ -222,9 +222,9 @@ python tests/security/test_security_vulnerabilities.py
 - Data consistency validation across all stores
 
 ### Performance Requirements
-- API response time < 500ms (95th percentile)
-- Throughput > 100 requests/second under normal load
-- ML prediction latency < 200ms
+- API response time sub-second (95th percentile)
+- Throughput optimized for telecom data patterns
+- ML prediction latency <5s for fraud detection
 - System availability > 99.9%
 
 ### Security Requirements

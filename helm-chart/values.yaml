@@ -1,12 +1,12 @@
 # ==============================================================================
-# FraudGuard 360 - Helm Values Configuration
+# FraudGuard 360 - Enterprise Helm Values Configuration
 # Configurable values for all environments (dev, staging, prod)
 # ==============================================================================
 
 # Global Configuration
 global:
   # Container Registry
-  imageRegistry: ""
+  imageRegistry: "ghcr.io/youss2f"
   imagePullSecrets: []
   
   # Environment
@@ -31,14 +31,83 @@ namespace:
   create: true
   name: fraudguard
 
+# Core ML Service Configuration
+core-ml-service:
+  enabled: true
+  replicaCount: 3
+  
+  image:
+    repository: fraudguard-360-core-ml-service
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# Risk Scoring Service Configuration  
+risk-scoring-service:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: fraudguard-360-risk-scoring-service
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8002
+    targetPort: 8002
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Graph Analytics Service Configuration
+graph-analytics-service:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: fraudguard-360-graph-analytics-service
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8003
+    targetPort: 8003
+  
+  resources:
+    requests:
+      memory: "768Mi"
+      cpu: "300m"
+    limits:
+      memory: "1.5Gi"
+      cpu: "750m"
+
 # API Gateway Configuration
 api-gateway:
   enabled: true
   replicaCount: 3
   
   image:
-    repository: fraudguard/api-gateway
-    tag: "1.0.0"
+    repository: fraudguard-360-api-gateway
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
   
   service:

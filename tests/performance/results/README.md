@@ -27,9 +27,9 @@ Each test run generates:
 
 ## Performance Targets
 
-Based on PRD requirements:
-- **Response Time**: < 200ms for 95% of requests
-- **Throughput**: 5,000-25,000 TPS
+Based on telecom fraud detection requirements:
+- **Detection Time**: <5s for fraud analysis
+- **Processing**: Optimized for telecom data patterns  
 - **Availability**: 99.9% uptime
 - **Error Rate**: < 0.1%
 

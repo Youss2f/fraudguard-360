@@ -1,49 +1,48 @@
-# FraudGuard 360° - Real-Time Fraud Detection System
+# FraudGuard 360° - Telecom Fraud Detection System
 
 [![CI/CD Pipeline](https://github.com/Youss2f/fraudguard-360/actions/workflows/main.yml/badge.svg)](https://github.com/Youss2f/fraudguard-360/actions/workflows/main.yml)
 [![Security Scan](https://img.shields.io/badge/Security-OWASP%20ZAP-green)](https://github.com/Youss2f/fraudguard-360/security)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Performance](https://img.shields.io/badge/Latency-%3C200ms-success)](https://github.com/Youss2f/fraudguard-360)
-[![Throughput](https://img.shields.io/badge/TPS-25K%2B-success)](https://github.com/Youss2f/fraudguard-360)
+[![Performance](https://img.shields.io/badge/Detection-%3C5s-success)](https://github.com/Youss2f/fraudguard-360)
+[![Language Distribution](https://img.shields.io/badge/Python-53.1%25-blue)](https://github.com/Youss2f/fraudguard-360)
 
-> 🚀 **Enterprise-grade real-time fraud detection system** with microservices architecture, graph-based AI, and sub-200ms response times.
+> 🚀 **Next-generation telecom fraud detection prototype** developed for the Sentinel V2 platform, featuring graph-based AI and distributed stream processing.
 
-FraudGuard 360° is a cloud-native fraud detection platform engineered for high-performance financial transaction monitoring. It combines GraphSAGE neural networks, Apache Flink stream processing, and microservices architecture to deliver sophisticated fraud detection with enterprise-grade reliability.
+FraudGuard 360° is a prototype system developed as part of Ezi Data EMEA R&D initiative to validate innovative architecture based on data streaming and artificial intelligence for real-time telecom fraud detection. The system reduces detection latency from 24 hours to less than 5 seconds using GraphSAGE neural networks and Apache Flink stream processing.
 
 ## 🏗️ **Architecture Overview**
 
-FraudGuard 360° implements a modern microservices architecture optimized for real-time fraud detection:
+FraudGuard 360° implements a distributed microservices architecture optimized for telecom fraud detection:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Frontend      │────│   API Gateway    │────│   AI Service    │
+│   Dashboard     │────│   API Gateway    │────│  ML Inference   │
 │   (React/TS)    │    │   (FastAPI)      │    │   (GraphSAGE)   │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │                        │
                        ┌────────▼────────┐      ┌───────▼────────┐
-                       │ Processing Svc  │      │  Graph Service │
+                       │ Stream Processor│      │ Graph Analytics│
                        │  (Flink/Java)   │◄─────┤   (Neo4j)      │
                        └─────────────────┘      └────────────────┘
                                 │                        ▲
                        ┌────────▼────────┐               │
                        │   Apache Kafka  │───────────────┘
-                       │   (Streaming)   │
+                       │   (Data Stream) │
                        └─────────────────┘
                                 │
                     ┌───────────▼───────────┐
                     │    Infrastructure    │
-                    │ Redis │ PostgreSQL   │
+                    │   Neo4j │ Redis      │
                     │ Prometheus │ Grafana │
                     └───────────────────────┘
 ```
 
 ### **🎯 Core Capabilities**
-- **⚡ Sub-200ms Response**: Real-time transaction analysis with <150ms average latency
-- **🚀 High Throughput**: Process 25,000+ transactions per second
-- **🧠 AI-Powered**: GraphSAGE neural networks for sophisticated pattern detection
-- **📊 Graph Analytics**: Neo4j relationship analysis for fraud network detection
-- **🔄 Event-Driven**: Kafka-based microservices communication
-- **🔒 Enterprise Security**: JWT authentication, OWASP compliance, vulnerability scanning
+- **⚡ Real-time Detection**: Telecom fraud analysis with <5 second detection latency
+- **🧠 Graph-based AI**: GraphSAGE neural networks for fraud network pattern detection
+- **📊 Network Analysis**: Neo4j relationship analysis for complex fraud ring detection
+- **🔄 Stream Processing**: Apache Kafka and Flink for distributed data pipeline
+- **� Latency Reduction**: From 24 hours to <5 seconds detection time
 
 ## 🛠️ **Technology Stack**
 
@@ -144,8 +143,8 @@ The project includes a comprehensive GitHub Actions pipeline:
 
 | Metric | Target | Achieved |
 |--------|--------|----------|
-| **Response Time** | <200ms (95th percentile) | ✅ <150ms |
-| **Throughput** | 5,000-25,000 TPS | ✅ 30,000+ TPS |
+| **Detection Time** | <5s telecom fraud analysis | ✅ <5s |
+| **Processing** | Optimized for telecom patterns | ✅ Efficient |
 | **Availability** | 99.9% uptime | ✅ 99.95% |
 | **Fraud Detection** | <2% false positives | ✅ <1.5% |
 | **Model Accuracy** | >95% precision | ✅ 97.2% |
@@ -185,10 +184,10 @@ curl http://localhost:8081/jobs      # Flink Status
 
 | Metric | Target | Achieved |
 |--------|--------|----------|
-| CDR Processing Rate | 100k/sec | 125k/sec |
-| Fraud Detection Latency | <500ms | 287ms |
+| CDR Processing Rate | Optimized for telecom | Efficient |
+| Fraud Detection Latency | <5s | <5s |
 | ML Model Accuracy | >95% | 97.3% |
-| API Response Time (P95) | <200ms | 156ms |
+| API Response Time | Sub-second | Efficient |
 
 ## Contributing
 
@@ -285,8 +284,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 **Author**
 
-**Youssef ATERTOUR** - Software Engineer specializing in distributed systems and machine learning applications.
+**Youssef ATERTOUR** - I am a 5th-year Computer Science and Network Engineering student with a strong passion for DevOps, Cloud and Software Development, CI/CD pipelines and managing cloud infrastructures, Driven 5th-year Computer Science and Network Engineering student with a solid academic foundation in software development and a keen focus on applying modern DevOps practices. Gained foundational experience with CI/CD concepts, containerization (Docker), and cloud services through university coursework and hands-on academic projects.
 
 ---
 
-**Built with ❤️ for enterprise fraud prevention**
+**Built with ❤️ for telecom fraud detection**

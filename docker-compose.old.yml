@@ -119,141 +119,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Core ML Fraud Detection Service
-  core-ml-service:
-    build:
-      context: ./core-ml-service
-      dockerfile: Dockerfile
-    hostname: core-ml-service
-    container_name: fraudguard-core-ml-service
-    ports:
-      - "8001:8001"
-    depends_on:
-      - redis
-      - neo4j
-    environment:
-      REDIS_URL: redis://redis:6379
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: fraudguard360
-      MODEL_VERSION: v2.0.0
-      LOG_LEVEL: INFO
-    volumes:
-      - ml-models:/app/models
-      - ml-checkpoints:/app/checkpoints
-    networks:
-      - fraudguard-network
-    healthcheck:
-      test: curl -f http://localhost:8001/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-  # Risk Scoring Service
-  risk-scoring-service:
-    build:
-      context: ./risk-scoring-service
-      dockerfile: Dockerfile
-    hostname: risk-scoring-service
-    container_name: fraudguard-risk-scoring-service
-    ports:
-      - "8002:8002"
-    depends_on:
-      - redis
-      - postgres
-    environment:
-      REDIS_URL: redis://redis:6379
-      POSTGRES_URL: postgresql://postgres:fraudguard360@postgres:5432/fraudguard
-      CACHE_TTL: 300
-      LOG_LEVEL: INFO
-    networks:
-      - fraudguard-network
-    healthcheck:
-      test: curl -f http://localhost:8002/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-  # Graph Analytics Service
-  graph-analytics-service:
-    build:
-      context: ./graph-analytics-service
-      dockerfile: Dockerfile
-    hostname: graph-analytics-service
-    container_name: fraudguard-graph-analytics-service
-    ports:
-      - "8003:8003"
-    depends_on:
-      - neo4j
-      - redis
-    environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: fraudguard360
-      REDIS_URL: redis://redis:6379
-      CACHE_TTL: 600
-      LOG_LEVEL: INFO
-    networks:
-      - fraudguard-network
-    healthcheck:
-      test: curl -f http://localhost:8003/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-  # Flink Stream Processing
-  flink-jobmanager:
-    image: apache/flink:1.18-java11
-    hostname: flink-jobmanager
-    container_name: fraudguard-flink-jobmanager
-    ports:
-      - "6123:6123"
-      - "8081:8081"
-    command: jobmanager
-    environment:
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager
-        state.backend: rocksdb
-        state.backend.incremental: true
-        state.checkpoints.dir: file:///tmp/flink-checkpoints
-        state.savepoints.dir: file:///tmp/flink-savepoints
-        execution.checkpointing.interval: 10000
-        execution.checkpointing.min-pause: 5000
-    volumes:
-      - flink-checkpoints:/tmp/flink-checkpoints
-      - flink-savepoints:/tmp/flink-savepoints
-      - ./stream-processor-flink/target:/opt/flink/jobs
-    networks:
-      - fraudguard-network
-    restart: unless-stopped
-
-  flink-taskmanager:
-    image: apache/flink:1.18-java11
-    hostname: flink-taskmanager
-    container_name: fraudguard-flink-taskmanager
-    depends_on:
-      - flink-jobmanager
-      - kafka
-    command: taskmanager
-    environment:
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        taskmanager.memory.process.size: 2g
-    volumes:
-      - flink-checkpoints:/tmp/flink-checkpoints
-      - flink-savepoints:/tmp/flink-savepoints
-    networks:
-      - fraudguard-network
-    restart: unless-stopped
-
-  # API Gateway
+  # Microservices
   api-gateway:
     build:
-      context: ./api-gateway
+      context: ./services/api-gateway
       dockerfile: Dockerfile
     hostname: api-gateway
     container_name: fraudguard-api-gateway
@@ -261,18 +130,17 @@ services:
       - "8000:8000"
     depends_on:
       - redis
-      - core-ml-service
-      - risk-scoring-service
-      - graph-analytics-service
+      - ai-service
+      - graph-service
+      - alerting-service
     environment:
       REDIS_URL: redis://redis:6379
-      CORE_ML_SERVICE_URL: http://core-ml-service:8001
-      RISK_SCORING_SERVICE_URL: http://risk-scoring-service:8002
-      GRAPH_ANALYTICS_SERVICE_URL: http://graph-analytics-service:8003
+      AI_SERVICE_URL: http://ai-service:8001
+      GRAPH_SERVICE_URL: http://graph-service:8002
+      ALERTING_SERVICE_URL: http://alerting-service:8003
       SECRET_KEY: ${SECRET_KEY:-fraudguard-360-production-secret-key}
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
-      RATE_LIMIT_PER_MINUTE: 2000
-      LOG_LEVEL: INFO
+      RATE_LIMIT_PER_MINUTE: 1000
     networks:
       - fraudguard-network
     healthcheck:
@@ -282,7 +150,111 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Minimal Frontend Dashboard
+  processing-service:
+    build:
+      context: ./services/processing-service
+      dockerfile: Dockerfile
+    hostname: processing-service
+    container_name: fraudguard-processing-service
+    depends_on:
+      - kafka
+      - neo4j
+      - ai-service
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC_CDR: cdr-events
+      KAFKA_TOPIC_ALERTS: fraud-alerts
+      KAFKA_GROUP_ID: fraud-detection-processor
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: fraudguard360
+      AI_SERVICE_URL: http://ai-service:8001
+      CHECKPOINT_INTERVAL: 5000
+      PARALLELISM: 4
+    volumes:
+      - processing-checkpoints:/opt/flink/checkpoints
+    networks:
+      - fraudguard-network
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    hostname: ai-service
+    container_name: fraudguard-ai-service
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      MODEL_VERSION: v1.2.0
+      MODEL_PATH: /app/models/graphsage_fraud_detector.pth
+    volumes:
+      - ai-models:/app/models
+    networks:
+      - fraudguard-network
+    healthcheck:
+      test: curl -f http://localhost:8001/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  graph-service:
+    build:
+      context: ./services/graph-service
+      dockerfile: Dockerfile
+    hostname: graph-service
+    container_name: fraudguard-graph-service
+    ports:
+      - "8002:8002"
+    depends_on:
+      - neo4j
+      - redis
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: fraudguard360
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL: 300
+    networks:
+      - fraudguard-network
+    healthcheck:
+      test: curl -f http://localhost:8002/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  alerting-service:
+    build:
+      context: ./services/alerting-service
+      dockerfile: Dockerfile
+    hostname: alerting-service
+    container_name: fraudguard-alerting-service
+    ports:
+      - "8003:8003"
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC_ALERTS: fraud-alerts
+      KAFKA_GROUP_ID: alerting-service
+      POSTGRES_URL: postgresql://postgres:fraudguard360@postgres:5432/fraudguard
+      REDIS_URL: redis://redis:6379
+    networks:
+      - fraudguard-network
+    healthcheck:
+      test: curl -f http://localhost:8003/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -349,10 +321,8 @@ volumes:
   neo4j-plugins:
   redis-data:
   postgres-data:
-  flink-checkpoints:
-  flink-savepoints:
-  ml-models:
-  ml-checkpoints:
+  processing-checkpoints:
+  ai-models:
   prometheus-data:
   grafana-data:
 
@@ -362,3 +332,35 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8001:8001"
+    depends_on:
+      - neo4j
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_WS_URL: ws://localhost:8000/ws
+  flink-jobmanager:
+    image: apache/flink:1.18
+    command: jobmanager
+    ports:
+      - "6123:6123"
+      - "8081:8081"
+    environment:
+      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+  flink-taskmanager:
+    image: apache/flink:1.18
+    command: taskmanager
+    depends_on:
+      - flink-jobmanager
+    environment:
+      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager\ntaskmanager.numberOfTaskSlots: 1"
+    scale: 1

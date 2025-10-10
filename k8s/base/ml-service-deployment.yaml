@@ -1,20 +1,20 @@
 # ==============================================================================
-# FraudGuard 360 - ML Service Deployment
+# FraudGuard 360 - Core ML Service Deployment
 # GraphSAGE-based fraud detection inference service
 # ==============================================================================
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ml-service
+  name: core-ml-service
   namespace: fraudguard
   labels:
-    app.kubernetes.io/name: ml-service
+    app.kubernetes.io/name: core-ml-service
     app.kubernetes.io/component: ml-inference
     app.kubernetes.io/part-of: fraudguard-360
-    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/version: "2.0.0"
 spec:
-  replicas: 2
+  replicas: 3
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,12 +22,12 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ml-service
+      app.kubernetes.io/name: core-ml-service
       app.kubernetes.io/component: ml-inference
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ml-service
+        app.kubernetes.io/name: core-ml-service
         app.kubernetes.io/component: ml-inference
         app.kubernetes.io/part-of: fraudguard-360
         app.kubernetes.io/version: "1.0.0"

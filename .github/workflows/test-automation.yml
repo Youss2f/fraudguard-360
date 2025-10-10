@@ -1,4 +1,4 @@
-name: 'FraudGuard 360 - Test & Quality Assurance'
+name: 'FraudGuard 360 - Enterprise Testing Suite'
 
 on:
   push:
@@ -21,13 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [api-gateway, ml-service, frontend, flink-jobs]
+        service: [core-ml-service, risk-scoring-service, graph-analytics-service, api-gateway, frontend, stream-processor-flink]
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Python (for API Gateway & ML Service)
+    - name: Setup Python (for ML Services & API Gateway)
       if: matrix.service == 'api-gateway' || matrix.service == 'ml-service'
       uses: actions/setup-python@v4
       with:
