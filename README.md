@@ -284,8 +284,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 **Author**
 
-**Youssef ATERTOUR** - I am a 5th-year Computer Science and Network Engineering student with a strong passion for DevOps, Cloud and Software Development, CI/CD pipelines and managing cloud infrastructures, Driven 5th-year Computer Science and Network Engineering student with a solid academic foundation in software development and a keen focus on applying modern DevOps practices. Gained foundational experience with CI/CD concepts, containerization (Docker), and cloud services through university coursework and hands-on academic projects.
-
+**Youssef ATERTOUR** - 5th-year Computer Science and Network Engineering student.
 ---
 
 **Built with ❤️ for telecom fraud detection**
