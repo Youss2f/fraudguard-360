@@ -1,0 +1,823 @@
+﻿name: CI/CD Pipelinename: CI/CD Pipeline
+
+
+
+on:on:
+
+  push:  push:
+
+    branches: [ main, develop ]    branches: [ main, develop ]
+
+  pull_request:  pull_request:
+
+    branches: [ main, develop ]    branches: [ main, develop ]
+
+  workflow_dispatch:  workflow_dispatch:
+
+
+
+env:env:
+
+  REGISTRY: ghcr.io  REGISTRY: ghcr.io
+
+  IMAGE_NAME: ${{ github.repository }}  IMAGE_NAME: ${{ github.repository }}
+
+
+
+jobs:jobs:
+
+  test-python-services:  test-python-services:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    strategy:    strategy:
+
+      matrix:      matrix:
+
+        python-version: [3.11, 3.12]        python-version: [3.11, 3.12]
+
+        service: [ml-service, api-gateway, services/ai-service, services/api-gateway, services/graph-service]        service: [ml-service, api-gateway, services/ai-service, services/api-gateway, services/graph-service]
+
+        
+
+    steps:    steps:
+
+    - uses: actions/checkout@v4    - uses: actions/checkout@v4
+
+        
+
+    - name: Set up Python ${{ matrix.python-version }}    - name: Set up Python ${{ matrix.python-version }}
+
+      uses: actions/setup-python@v4      uses: actions/setup-python@v4
+
+      with:      with:
+
+        python-version: ${{ matrix.python-version }}        python-version: ${{ matrix.python-version }}
+
+        
+
+    - name: Cache pip dependencies    - name: Cache pip dependencies
+
+      uses: actions/cache@v3      uses: actions/cache@v3
+
+      with:      with:
+
+        path: ~/.cache/pip        path: ~/.cache/pip
+
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
+
+        restore-keys: |        restore-keys: |
+
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+        
+
+    - name: Install dependencies    - name: Install dependencies
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        python -m pip install --upgrade pip        python -m pip install --upgrade pip
+
+        pip install -r requirements.txt        pip install -r requirements.txt
+
+        pip install pytest pytest-cov bandit safety flake8        pip install pytest pytest-cov bandit safety flake8
+
+        
+
+    - name: Run linting with flake8    - name: Run linting with flake8
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+        
+
+    - name: Run security checks with bandit    - name: Run security checks
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        bandit -r . --severity-level medium || true        bandit -r . --severity-level medium || true
+
+            safety check || true
+
+    - name: Check for vulnerabilities with safety    
+
+      working-directory: ${{ matrix.service }}    - name: Run tests
+
+      run: |      working-directory: ${{ matrix.service }}
+
+        safety check || true      run: |
+
+            if [ -d "tests" ] || [ -f "test_*.py" ]; then
+
+    - name: Run tests with pytest          pytest --cov=. --cov-report=xml || true
+
+      working-directory: ${{ matrix.service }}        else
+
+      run: |          echo "No tests found, skipping"
+
+        if [ -d "tests" ] || [ -f "test_*.py" ]; then        fi
+
+          pytest --cov=. --cov-report=xml || true
+
+        else  test-java-services:
+
+          echo "No tests found, skipping"    runs-on: ubuntu-latest
+
+        fi    strategy:
+
+          matrix:
+
+    - name: Upload coverage reports        java-version: [11, 17]
+
+      uses: codecov/codecov-action@v3        service: [stream-processor-flink, flink-jobs]
+
+      if: matrix.python-version == '3.12'    
+
+      with:    steps:
+
+        file: ${{ matrix.service }}/coverage.xml    - uses: actions/checkout@v4
+
+        flags: ${{ matrix.service }}    
+
+        name: ${{ matrix.service }}-coverage    - name: Set up JDK ${{ matrix.java-version }}
+
+      uses: actions/setup-java@v3
+
+  test-java-services:      with:
+
+    runs-on: ubuntu-latest        java-version: ${{ matrix.java-version }}
+
+    strategy:        distribution: 'temurin'
+
+      matrix:    
+
+        java-version: [11, 17]    - name: Run Maven tests
+
+        service: [stream-processor-flink, flink-jobs]      working-directory: ${{ matrix.service }}
+
+          run: |
+
+    steps:        mvn clean compile test || true
+
+    - uses: actions/checkout@v4
+
+      test-frontend:
+
+    - name: Set up JDK ${{ matrix.java-version }}    runs-on: ubuntu-latest
+
+      uses: actions/setup-java@v3    
+
+      with:    steps:
+
+        java-version: ${{ matrix.java-version }}    - uses: actions/checkout@v4
+
+        distribution: 'temurin'    
+
+        - name: Use Node.js 18
+
+    - name: Cache Maven dependencies      uses: actions/setup-node@v3
+
+      uses: actions/cache@v3      with:
+
+      with:        node-version: 18
+
+        path: ~/.m2        cache: 'npm'
+
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}        cache-dependency-path: frontend/package-lock.json
+
+        restore-keys: ${{ runner.os }}-m2    
+
+        - name: Install and test
+
+    - name: Run Maven tests      working-directory: frontend
+
+      working-directory: ${{ matrix.service }}      run: |
+
+      run: |        npm ci
+
+        mvn clean compile test-compile        npm run build
+
+        mvn test || true        npm run test:ci || true
+
+    
+
+    - name: Upload test results  build-status:
+
+      uses: actions/upload-artifact@v3    runs-on: ubuntu-latest
+
+      if: always()    needs: [test-python-services, test-java-services, test-frontend]
+
+      with:
+
+        name: java-test-results-${{ matrix.service }}-${{ matrix.java-version }}    if: always()        
+
+        path: ${{ matrix.service }}/target/surefire-reports/
+
+    
+
+  test-frontend:
+
+    runs-on: ubuntu-latest    steps:    - name: Run security checks with bandit    - name: Run security checks with bandit
+
+    
+
+    steps:    - name: Check build status
+
+    - uses: actions/checkout@v4
+
+          run: echo "Build completed with status check"      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+    - name: Use Node.js 18
+
+      uses: actions/setup-node@v3      run: |      run: |
+
+      with:
+
+        node-version: 18        bandit -r . -f json -o bandit-report.json || true        bandit -r . -f json -o bandit-report.json || true
+
+        cache: 'npm'
+
+        cache-dependency-path: frontend/package-lock.json        bandit -r . --severity-level medium        bandit -r . --severity-level medium
+
+    
+
+    - name: Install dependencies        
+
+      working-directory: frontend
+
+      run: npm ci    - name: Check for vulnerabilities with safety    - name: Check for vulnerabilities with safety
+
+    
+
+    - name: Run linting      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      working-directory: frontend
+
+      run: |      run: |      run: |
+
+        npm run lint || true
+
+            safety check --json --output safety-report.json || true        safety check --json --output safety-report.json || true
+
+    - name: Run tests
+
+      working-directory: frontend        safety check        safety check
+
+      run: |
+
+        npm run test:ci || true        
+
+    
+
+    - name: Build application    - name: Run tests with pytest    - name: Run tests with pytest
+
+      working-directory: frontend
+
+      run: |      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+        npm run build
+
+          run: |      run: |
+
+    - name: Upload build artifacts
+
+      uses: actions/upload-artifact@v3        if [ -d "tests" ]; then        if [ -d "tests" ]; then
+
+      with:
+
+        name: frontend-build          pytest tests/ --cov=. --cov-report=xml --cov-report=html          pytest tests/ --cov=. --cov-report=xml --cov-report=html
+
+        path: frontend/build/
+
+        elif [ -f "test_*.py" ]; then        elif [ -f "test_*.py" ]; then
+
+  build-status:
+
+    runs-on: ubuntu-latest          pytest test_*.py --cov=. --cov-report=xml --cov-report=html          pytest test_*.py --cov=. --cov-report=xml --cov-report=html
+
+    needs: [test-python-services, test-java-services, test-frontend]
+
+    if: always()        else        else
+
+    
+
+    steps:          echo "No tests found, skipping test execution"          echo "No tests found, skipping test execution"
+
+    - name: Check build status
+
+      run: |        fi        fi
+
+        echo "Python services: ${{ needs.test-python-services.result }}"
+
+        echo "Java services: ${{ needs.test-java-services.result }}"        
+
+        echo "Frontend: ${{ needs.test-frontend.result }}"
+
+            - name: Upload coverage reports    - name: Upload coverage reports
+
+        if [[ "${{ needs.test-python-services.result }}" == "failure" || 
+
+              "${{ needs.test-java-services.result }}" == "failure" ||       uses: codecov/codecov-action@v3      uses: codecov/codecov-action@v3
+
+              "${{ needs.test-frontend.result }}" == "failure" ]]; then
+
+          echo "One or more jobs failed"      if: matrix.python-version == '3.12'      if: matrix.python-version == '3.12'
+
+          exit 1
+
+        else      with:      with:
+
+          echo "All jobs completed successfully"
+
+        fi        file: ${{ matrix.service }}/coverage.xml        file: ${{ matrix.service }}/coverage.xml
+
+        flags: ${{ matrix.service }}        flags: ${{ matrix.service }}
+
+        name: ${{ matrix.service }}-coverage        name: ${{ matrix.service }}-coverage
+
+
+
+  # Java Services Testing  # Java Services Testing
+
+  test-java-services:  test-java-services:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    strategy:    strategy:
+
+      matrix:      matrix:
+
+        java-version: [11, 17]        java-version: [11, 17]
+
+        service: [stream-processor-flink, flink-jobs, services/processing-service]        service: [stream-processor-flink, flink-jobs, services/processing-service]
+
+        
+
+    steps:    steps:
+
+    - uses: actions/checkout@v4    - uses: actions/checkout@v4
+
+        
+
+    - name: Set up JDK ${{ matrix.java-version }}    - name: Set up JDK ${{ matrix.java-version }}
+
+      uses: actions/setup-java@v3      uses: actions/setup-java@v3
+
+      with:      with:
+
+        java-version: ${{ matrix.java-version }}        java-version: ${{ matrix.java-version }}
+
+        distribution: 'temurin'        distribution: 'temurin'
+
+        
+
+    - name: Cache Maven dependencies    - name: Cache Maven dependencies
+
+      uses: actions/cache@v3      uses: actions/cache@v3
+
+      with:      with:
+
+        path: ~/.m2        path: ~/.m2
+
+        key: ${{ runner.os }}-m2-${{ matrix.java-version }}-${{ hashFiles('**/pom.xml') }}        key: ${{ runner.os }}-m2-${{ matrix.java-version }}-${{ hashFiles('**/pom.xml') }}
+
+        restore-keys: |        restore-keys: |
+
+          ${{ runner.os }}-m2-${{ matrix.java-version }}-          ${{ runner.os }}-m2-${{ matrix.java-version }}-
+
+        
+
+    - name: Run Maven tests    - name: Run Maven tests
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        mvn clean compile test        mvn clean compile test
+
+        
+
+    - name: Run security checks with OWASP dependency check    - name: Run security checks with OWASP dependency check
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        mvn org.owasp:dependency-check-maven:check        mvn org.owasp:dependency-check-maven:check
+
+        
+
+    - name: Generate test reports    - name: Generate test reports
+
+      working-directory: ${{ matrix.service }}      working-directory: ${{ matrix.service }}
+
+      run: |      run: |
+
+        mvn surefire-report:report        mvn surefire-report:report
+
+        
+
+    - name: Upload test results    - name: Upload test results
+
+      uses: actions/upload-artifact@v3      uses: actions/upload-artifact@v3
+
+      if: always()      if: always()
+
+      with:      with:
+
+        name: test-results-${{ matrix.service }}-java${{ matrix.java-version }}        name: test-results-${{ matrix.service }}-java${{ matrix.java-version }}
+
+        path: ${{ matrix.service }}/target/surefire-reports/        path: ${{ matrix.service }}/target/surefire-reports/
+
+
+
+  # Frontend Testing  # Frontend Testing
+
+  test-frontend:  test-frontend:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    strategy:    strategy:
+
+      matrix:      matrix:
+
+        node-version: [18, 20]        node-version: [18, 20]
+
+        
+
+    steps:    steps:
+
+    - uses: actions/checkout@v4    - uses: actions/checkout@v4
+
+        
+
+    - name: Use Node.js ${{ matrix.node-version }}    - name: Use Node.js ${{ matrix.node-version }}
+
+      uses: actions/setup-node@v3      uses: actions/setup-node@v3
+
+      with:      with:
+
+        node-version: ${{ matrix.node-version }}        node-version: ${{ matrix.node-version }}
+
+        cache: 'npm'        cache: 'npm'
+
+        cache-dependency-path: frontend/package-lock.json        cache-dependency-path: frontend/package-lock.json
+
+        
+
+    - name: Install dependencies    - name: Install dependencies
+
+      working-directory: frontend      working-directory: frontend
+
+      run: npm ci      run: npm ci
+
+        
+
+    - name: Run linting    - name: Run linting
+
+      working-directory: frontend      working-directory: frontend
+
+      run: |      run: |
+
+        npx eslint src/ --ext .ts,.tsx --max-warnings 0 || true        npx eslint src/ --ext .ts,.tsx --max-warnings 0 || true
+
+        
+
+    - name: Run type checking    - name: Run type checking
+
+      working-directory: frontend      working-directory: frontend
+
+      run: npx tsc --noEmit      run: npx tsc --noEmit
+
+        
+
+    - name: Run tests    - name: Run tests
+
+      working-directory: frontend      working-directory: frontend
+
+      run: npm run test:ci      run: npm run test:ci
+
+        
+
+    - name: Run accessibility tests    - name: Run accessibility tests
+
+      working-directory: frontend      working-directory: frontend
+
+      run: |      run: |
+
+        if npm run | grep -q "test:accessibility"; then        if npm run | grep -q "test:accessibility"; then
+
+          npm run test:accessibility          npm run test:accessibility
+
+        else        else
+
+          echo "Accessibility tests not configured"          echo "Accessibility tests not configured"
+
+        fi        fi
+
+        
+
+    - name: Build application    - name: Build application
+
+      working-directory: frontend      working-directory: frontend
+
+      run: npm run build      run: npm run build
+
+        
+
+    - name: Upload build artifacts    - name: Upload build artifacts
+
+      uses: actions/upload-artifact@v3      uses: actions/upload-artifact@v3
+
+      with:      with:
+
+        name: frontend-build-${{ matrix.node-version }}        name: frontend-build-${{ matrix.node-version }}
+
+        path: frontend/build/        path: frontend/build/
+
+
+
+  # Integration Tests  # Integration Tests
+
+  integration-tests:  integration-tests:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    needs: [test-python-services, test-java-services, test-frontend]    needs: [test-python-services, test-java-services, test-frontend]
+
+        
+
+    services:    services:
+
+      postgres:      postgres:
+
+        image: postgres:15        image: postgres:15
+
+        env:        env:
+
+          POSTGRES_PASSWORD: postgres          POSTGRES_PASSWORD: postgres
+
+          POSTGRES_DB: fraudguard_test          POSTGRES_DB: fraudguard_test
+
+        options: >-        options: >-
+
+          --health-cmd pg_isready          --health-cmd pg_isready
+
+          --health-interval 10s          --health-interval 10s
+
+          --health-timeout 5s          --health-timeout 5s
+
+          --health-retries 5          --health-retries 5
+
+        ports:        ports:
+
+          - 5432:5432          - 5432:5432
+
+            
+
+      redis:      redis:
+
+        image: redis:7        image: redis:7
+
+        options: >-        options: >-
+
+          --health-cmd "redis-cli ping"          --health-cmd "redis-cli ping"
+
+          --health-interval 10s          --health-interval 10s
+
+          --health-timeout 5s          --health-timeout 5s
+
+          --health-retries 5          --health-retries 5
+
+        ports:        ports:
+
+          - 6379:6379          - 6379:6379
+
+            
+
+      neo4j:      neo4j:
+
+        image: neo4j:5        image: neo4j:5
+
+        env:        env:
+
+          NEO4J_AUTH: neo4j/test          NEO4J_AUTH: neo4j/test
+
+          NEO4J_PLUGINS: '["apoc"]'          NEO4J_PLUGINS: '["apoc"]'
+
+        ports:        ports:
+
+          - 7474:7474          - 7474:7474
+
+          - 7687:7687          - 7687:7687
+
+        
+
+    steps:    steps:
+
+    - uses: actions/checkout@v4    - uses: actions/checkout@v4
+
+        
+
+    - name: Set up Python 3.12    - name: Set up Python 3.12
+
+      uses: actions/setup-python@v4      uses: actions/setup-python@v4
+
+      with:      with:
+
+        python-version: 3.12        python-version: 3.12
+
+        
+
+    - name: Set up JDK 11    - name: Set up JDK 11
+
+      uses: actions/setup-java@v3      uses: actions/setup-java@v3
+
+      with:      with:
+
+        java-version: 11        java-version: 11
+
+        distribution: 'temurin'        distribution: 'temurin'
+
+        
+
+    - name: Install Python dependencies    - name: Install Python dependencies
+
+      run: |      run: |
+
+        python -m pip install --upgrade pip        python -m pip install --upgrade pip
+
+        if [ -f "tests/requirements.txt" ]; then        if [ -f "tests/requirements.txt" ]; then
+
+          pip install -r tests/requirements.txt          pip install -r tests/requirements.txt
+
+        else        else
+
+          pip install pytest requests httpx          pip install pytest requests httpx
+
+        fi        fi
+
+        
+
+    - name: Wait for services to be ready    - name: Wait for services to be ready
+
+      run: |      run: |
+
+        sleep 30        sleep 30
+
+        curl -f http://localhost:7474 || echo "Neo4j not ready"        curl -f http://localhost:7474 || echo "Neo4j not ready"
+
+        
+
+    - name: Run integration tests    - name: Run integration tests
+
+      run: |      run: |
+
+        if [ -f "tests/test_runner.py" ]; then        if [ -f "tests/test_runner.py" ]; then
+
+          python tests/test_runner.py --integration          python tests/test_runner.py --integration
+
+        else        else
+
+          echo "Integration tests not found, skipping"          echo "Integration tests not found, skipping"
+
+        fi        fi
+
+      env:      env:
+
+        POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/fraudguard_test        POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/fraudguard_test
+
+        REDIS_URL: redis://localhost:6379        REDIS_URL: redis://localhost:6379
+
+        NEO4J_URL: bolt://localhost:7687        NEO4J_URL: bolt://localhost:7687
+
+        NEO4J_AUTH: neo4j/test        NEO4J_AUTH: neo4j/test
+
+
+
+  # Build Status Check  # Build Status Check
+
+  build-status:  build-status:
+
+    runs-on: ubuntu-latest    runs-on: ubuntu-latest
+
+    needs: [test-python-services, test-java-services, test-frontend, integration-tests]    needs: [test-python-services, test-java-services, test-frontend, integration-tests]
+
+    if: always()    if: always()
+
+        
+
+    steps:    steps:
+
+    - name: Check build status    - name: Check build status
+
+      run: |      run: |
+
+        if [[ "${{ needs.test-python-services.result }}" == "success" &&         if [[ "${{ needs.test-python-services.result }}" == "success" && 
+
+              "${{ needs.test-java-services.result }}" == "success" &&               "${{ needs.test-java-services.result }}" == "success" && 
+
+              "${{ needs.test-frontend.result }}" == "success" &&               "${{ needs.test-frontend.result }}" == "success" && 
+
+              "${{ needs.integration-tests.result }}" == "success" ]]; then              "${{ needs.integration-tests.result }}" == "success" ]]; then
+
+          echo "âœ… All builds passed!"          echo "âœ… All builds passed!"
+
+          exit 0          exit 0
+
+        else        else
+
+          echo "âŒ Some builds failed!"          echo "âŒ Some builds failed!"
+
+          echo "Python services: ${{ needs.test-python-services.result }}"          echo "Python services: ${{ needs.test-python-services.result }}"
+
+          echo "Java services: ${{ needs.test-java-services.result }}"          echo "Java services: ${{ needs.test-java-services.result }}"
+
+          echo "Frontend: ${{ needs.test-frontend.result }}"          echo "Frontend: ${{ needs.test-frontend.result }}"
+
+          echo "Integration tests: ${{ needs.integration-tests.result }}"          echo "Integration tests: ${{ needs.integration-tests.result }}"
+
+          exit 1          exit 1
+
+        fi        fi
+            cd frontend && npm ci
+          elif [[ "${{ matrix.service }}" == "flink-jobs" ]]; then
+            cd flink-jobs && mvn dependency:go-offline
+          else
+            cd ${{ matrix.service }}
+            pip install -r requirements.txt
+            pip install pytest pytest-cov
+          fi
+
+      - name: Run Tests
+        run: |
+          if [[ "${{ matrix.service }}" == "frontend" ]]; then
+            cd frontend && npm test -- --coverage --watchAll=false --ci
+          elif [[ "${{ matrix.service }}" == "flink-jobs" ]]; then
+            cd flink-jobs && mvn test
+          else
+            cd ${{ matrix.service }}
+            python -m pytest tests/ --cov=. --cov-report=xml -v
+          fi
+
+      - name: Build
+        run: |
+          if [[ "${{ matrix.service }}" == "frontend" ]]; then
+            cd frontend && npm run build
+          elif [[ "${{ matrix.service }}" == "flink-jobs" ]]; then
+            cd flink-jobs && mvn package -DskipTests
+          else
+            echo "Python service build completed"
+          fi
+
+  docker:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service: [api-gateway, ml-service, frontend]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

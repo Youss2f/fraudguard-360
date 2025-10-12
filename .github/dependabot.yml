@@ -1,0 +1,234 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/ml-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Youss2f"
+    assignees:
+      - "Youss2f"
+    commit-message:
+      prefix: "🔒 security"
+      prefix-development: "⬆️ deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "torch*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "pip"
+    directory: "/api-gateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Youss2f"
+    assignees:
+      - "Youss2f"
+    labels:
+      - "dependencies"
+      - "api-gateway"
+
+  - package-ecosystem: "pip"
+    directory: "/services/ai-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ai-service"
+
+  - package-ecosystem: "pip"
+    directory: "/services/api-gateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "services"
+
+  - package-ecosystem: "pip"
+    directory: "/services/graph-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "graph-service"
+
+  # Java/Maven dependencies
+  - package-ecosystem: "maven"
+    directory: "/stream-processor-flink"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Youss2f"
+    assignees:
+      - "Youss2f"
+    commit-message:
+      prefix: "⬆️ deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "java"
+      - "flink"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "org.apache.flink:*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "maven"
+    directory: "/flink-jobs"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "java"
+      - "flink-jobs"
+
+  - package-ecosystem: "maven"
+    directory: "/services/processing-service"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "java"
+      - "processing-service"
+
+  # Node.js/npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "Youss2f"
+    assignees:
+      - "Youss2f"
+    commit-message:
+      prefix: "⬆️ deps"
+      prefix-development: "⬆️ dev-deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "javascript"
+    versioning-strategy: "increase"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "react*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/ml-service"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "docker"
+      - "ml-service"
+
+  - package-ecosystem: "docker"
+    directory: "/api-gateway"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "docker"
+      - "api-gateway"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "docker"
+      - "frontend"
+
+  - package-ecosystem: "docker"
+    directory: "/stream-processor-flink"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "docker"
+      - "flink"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Youss2f"
+    assignees:
+      - "Youss2f"
+    commit-message:
+      prefix: "⬆️ actions"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci-cd"
+
+  # Terraform dependencies (if any)
+  - package-ecosystem: "terraform"
+    directory: "/infrastructure"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "terraform"
+      - "infrastructure"

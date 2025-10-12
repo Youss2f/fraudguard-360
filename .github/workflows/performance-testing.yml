@@ -1,0 +1,377 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 1 * * *'  # Daily at 1 AM UTC
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test'
+        required: true
+        default: 'load'
+        type: choice
+        options:
+        - load
+        - stress
+        - spike
+        - volume
+        - endurance
+      duration:
+        description: 'Test duration (e.g., 5m, 1h)'
+        required: false
+        default: '5m'
+      virtual_users:
+        description: 'Number of virtual users'
+        required: false
+        default: '50'
+
+jobs:
+  # Setup test environment
+  setup-test-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      test_url: ${{ steps.setup.outputs.test_url }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup test environment
+      id: setup
+      run: |
+        echo "Setting up performance test environment..."
+        
+        # Start services with docker-compose
+        docker-compose -f docker-compose.yml -f docker-compose.test.yml up -d
+        
+        # Wait for services to be ready
+        sleep 60
+        
+        # Health check
+        timeout 300 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+        
+        echo "test_url=http://localhost:8000" >> $GITHUB_OUTPUT
+        echo "✅ Test environment ready"
+
+  # Load Testing with K6
+  load-testing:
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    strategy:
+      matrix:
+        test_scenario:
+          - fraud-detection-api
+          - ml-inference
+          - user-registration
+          - transaction-processing
+          - dashboard-load
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup K6
+      run: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+    
+    - name: Run load test - ${{ matrix.test_scenario }}
+      run: |
+        # Set test parameters
+        export K6_VUS=${{ github.event.inputs.virtual_users || '50' }}
+        export K6_DURATION=${{ github.event.inputs.duration || '5m' }}
+        export BASE_URL=${{ needs.setup-test-environment.outputs.test_url }}
+        
+        # Run K6 test
+        k6 run --out json=test-results-${{ matrix.test_scenario }}.json \
+               tests/performance/k6-${{ matrix.test_scenario }}.js
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: k6-results-${{ matrix.test_scenario }}
+        path: test-results-${{ matrix.test_scenario }}.json
+
+  # Apache Bench Testing
+  apache-bench-testing:
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install Apache Bench
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y apache2-utils
+    
+    - name: Run Apache Bench tests
+      run: |
+        BASE_URL=${{ needs.setup-test-environment.outputs.test_url }}
+        
+        echo "Running Apache Bench tests..."
+        
+        # Test API Gateway health endpoint
+        ab -n 1000 -c 10 ${BASE_URL}/health > ab-health.txt
+        
+        # Test fraud detection endpoint (if available)
+        ab -n 500 -c 5 -p tests/performance/fraud-payload.json -T application/json ${BASE_URL}/api/v1/fraud/detect > ab-fraud-detection.txt || true
+        
+        echo "✅ Apache Bench tests completed"
+    
+    - name: Upload AB results
+      uses: actions/upload-artifact@v3
+      with:
+        name: apache-bench-results
+        path: ab-*.txt
+
+  # JMeter Testing
+  jmeter-testing:
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup JMeter
+      run: |
+        wget https://downloads.apache.org//jmeter/binaries/apache-jmeter-5.6.2.zip
+        unzip apache-jmeter-5.6.2.zip
+        sudo mv apache-jmeter-5.6.2 /opt/jmeter
+        sudo ln -s /opt/jmeter/bin/jmeter /usr/local/bin/jmeter
+    
+    - name: Run JMeter tests
+      run: |
+        # Check if JMeter test plan exists
+        if [ -f "tests/performance/fraud-detection-test-plan.jmx" ]; then
+          jmeter -n -t tests/performance/fraud-detection-test-plan.jmx \
+                 -l jmeter-results.jtl \
+                 -e -o jmeter-report/ \
+                 -Jbase_url=${{ needs.setup-test-environment.outputs.test_url }}
+        else
+          echo "JMeter test plan not found, skipping"
+        fi
+    
+    - name: Upload JMeter results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: jmeter-results
+        path: |
+          jmeter-results.jtl
+          jmeter-report/
+
+  # Python Locust Testing
+  locust-testing:
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Python and Locust
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        pip install locust requests
+    
+    - name: Run Locust tests
+      run: |
+        # Check if Locust file exists
+        if [ -f "tests/performance/locustfile.py" ]; then
+          locust -f tests/performance/locustfile.py \
+                 --host=${{ needs.setup-test-environment.outputs.test_url }} \
+                 --users=${{ github.event.inputs.virtual_users || '50' }} \
+                 --spawn-rate=10 \
+                 --run-time=${{ github.event.inputs.duration || '5m' }} \
+                 --headless \
+                 --html=locust-report.html \
+                 --csv=locust-results
+        else
+          echo "Locust file not found, skipping"
+        fi
+    
+    - name: Upload Locust results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: locust-results
+        path: |
+          locust-report.html
+          locust-results*
+
+  # Database Performance Testing
+  database-performance:
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fraudguard_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        pip install psycopg2-binary sqlalchemy pandas
+    
+    - name: Run database performance tests
+      run: |
+        python -c "
+        import psycopg2
+        import time
+        import statistics
+        
+        # Database connection
+        conn = psycopg2.connect(
+            host='localhost',
+            port=5432,
+            database='fraudguard_test',
+            user='postgres',
+            password='postgres'
+        )
+        
+        cur = conn.cursor()
+        
+        # Create test table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS performance_test (
+                id SERIAL PRIMARY KEY,
+                transaction_id VARCHAR(50),
+                amount DECIMAL(10,2),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Test insert performance
+        insert_times = []
+        for i in range(1000):
+            start = time.time()
+            cur.execute(
+                'INSERT INTO performance_test (transaction_id, amount) VALUES (%s, %s)',
+                (f'txn_{i}', 100.50 + i)
+            )
+            conn.commit()
+            insert_times.append(time.time() - start)
+        
+        # Test select performance
+        start = time.time()
+        cur.execute('SELECT COUNT(*) FROM performance_test')
+        result = cur.fetchone()
+        select_time = time.time() - start
+        
+        print(f'Average insert time: {statistics.mean(insert_times):.4f}s')
+        print(f'Select time: {select_time:.4f}s')
+        print(f'Total records: {result[0]}')
+        
+        cur.close()
+        conn.close()
+        "
+
+  # Performance Analysis and Reporting
+  performance-analysis:
+    runs-on: ubuntu-latest
+    needs: [load-testing, apache-bench-testing, jmeter-testing, locust-testing, database-performance]
+    if: always()
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Download all test results
+      uses: actions/download-artifact@v3
+    
+    - name: Setup Python for analysis
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install analysis dependencies
+      run: |
+        pip install pandas matplotlib seaborn jinja2
+    
+    - name: Analyze performance results
+      run: |
+        python -c "
+        import json
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import os
+        from pathlib import Path
+        
+        print('📊 Performance Test Analysis')
+        print('=' * 40)
+        
+        # Analyze K6 results
+        k6_results = []
+        for file in Path('.').glob('**/test-results-*.json'):
+            if file.exists():
+                with open(file) as f:
+                    data = json.load(f)
+                    # Process K6 JSON results
+                    print(f'K6 Test: {file.stem}')
+        
+        print('✅ Performance analysis completed')
+        "
+    
+    - name: Generate performance report
+      run: |
+        echo "## 📊 Performance Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- Virtual Users: ${{ github.event.inputs.virtual_users || '50' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Duration: ${{ github.event.inputs.duration || '5m' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Test Type: ${{ github.event.inputs.test_type || 'load' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Tool | Status | Artifacts |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|-----------|" >> $GITHUB_STEP_SUMMARY
+        echo "| K6 Load Testing | ${{ needs.load-testing.result }} | Available |" >> $GITHUB_STEP_SUMMARY
+        echo "| Apache Bench | ${{ needs.apache-bench-testing.result }} | Available |" >> $GITHUB_STEP_SUMMARY
+        echo "| JMeter | ${{ needs.jmeter-testing.result }} | Available |" >> $GITHUB_STEP_SUMMARY
+        echo "| Locust | ${{ needs.locust-testing.result }} | Available |" >> $GITHUB_STEP_SUMMARY
+        echo "| Database Performance | ${{ needs.database-performance.result }} | Available |" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup test environment
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [performance-analysis]
+    if: always()
+    
+    steps:
+    - name: Cleanup test environment
+      run: |
+        echo "Cleaning up test environment..."
+        docker-compose down -v || true
+        echo "✅ Cleanup completed"

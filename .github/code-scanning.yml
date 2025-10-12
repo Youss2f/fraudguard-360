@@ -1,0 +1,59 @@
+# Code Scanning Configuration for GitHub
+
+# This file configures default code scanning settings for the repository
+default_setup:
+  # Languages to analyze
+  languages:
+    - javascript
+    - python  
+    - java
+
+  # Query suites to run
+  queries:
+    - name: security-extended
+      uses: security-extended
+    - name: security-and-quality
+      uses: security-and-quality
+
+# Build configuration for different languages
+build:
+  java:
+    # Build commands for Java/Maven projects
+    commands:
+      - "cd stream-processor-flink && mvn clean compile -DskipTests"
+      - "cd flink-jobs && mvn clean compile -DskipTests"
+  
+  javascript:
+    # Build commands for Node.js/npm projects  
+    commands:
+      - "cd frontend && npm ci && npm run build"
+
+# Paths to include/exclude from scanning
+paths:
+  include:
+    - "**/*.java"
+    - "**/*.js"
+    - "**/*.ts" 
+    - "**/*.py"
+  exclude:
+    - "**/node_modules/**"
+    - "**/target/**"
+    - "**/__pycache__/**"
+    - "**/build/**"
+    - "**/dist/**"
+
+# Security scanning schedule
+schedule:
+  # Run CodeQL analysis weekly on Mondays at 6 PM UTC
+  - cron: "0 18 * * 1"
+
+# Additional configuration
+advanced:
+  # Disable default setup if using custom workflow
+  disable_default_setup: true
+  
+  # Upload results to GitHub Security tab
+  upload_results: true
+  
+  # Fail workflow on high severity issues
+  fail_on_error: false

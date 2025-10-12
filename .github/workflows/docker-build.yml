@@ -1,0 +1,212 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - ml-service
+          - api-gateway
+          - frontend
+          - stream-processor-flink
+          - services/ai-service
+          - services/api-gateway
+          - services/graph-service
+          - services/processing-service
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check if Dockerfile exists
+      id: dockerfile-check
+      run: |
+        if [ -f "${{ matrix.service }}/Dockerfile" ]; then
+          echo "dockerfile_exists=true" >> $GITHUB_OUTPUT
+          echo "Found Dockerfile in ${{ matrix.service }}"
+        else
+          echo "dockerfile_exists=false" >> $GITHUB_OUTPUT
+          echo "No Dockerfile found in ${{ matrix.service }}, skipping"
+        fi
+    
+    - name: Set up Docker Buildx
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.service }}
+        file: ${{ matrix.service }}/Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+    
+    - name: Run Trivy vulnerability scanner
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+    
+    - name: Upload Trivy scan results
+      if: steps.dockerfile-check.outputs.dockerfile_exists == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+  # Multi-arch image builds for production
+  build-production-images:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    strategy:
+      matrix:
+        service: [ml-service, api-gateway, frontend]
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build and push production image
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.service }}
+        file: ${{ matrix.service }}/Dockerfile
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:production
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Update deployment manifests
+  update-manifests:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: build-production-images
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update Kubernetes manifests
+      run: |
+        # Update image tags in Kubernetes manifests
+        find k8s/ -name "*.yaml" -o -name "*.yml" | xargs sed -i "s|image: ghcr.io/${{ github.repository }}/.*:.*|image: ghcr.io/${{ github.repository }}/\$SERVICE:${{ github.sha }}|g" || true
+    
+    - name: Update Docker Compose files
+      run: |
+        # Update image tags in Docker Compose files
+        find . -name "docker-compose*.yml" | xargs sed -i "s|image: ghcr.io/${{ github.repository }}/.*:.*|image: ghcr.io/${{ github.repository }}/\$SERVICE:${{ github.sha }}|g" || true
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update container images to ${{ github.sha }}"
+          git push
+        fi
+
+  # Image cleanup
+  cleanup-old-images:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: update-manifests
+    
+    steps:
+    - name: Delete old images
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          
+          // Get all packages for the repository
+          const packages = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+            package_type: 'container',
+            package_name: `${repo}/ml-service`,
+            org: owner,
+          });
+          
+          // Keep only the latest 10 versions, delete the rest
+          const versionsToDelete = packages.data.slice(10);
+          
+          for (const version of versionsToDelete) {
+            if (version.name !== 'latest' && version.name !== 'production') {
+              await github.rest.packages.deletePackageVersionForOrg({
+                package_type: 'container',
+                package_name: `${repo}/ml-service`,
+                org: owner,
+                package_version_id: version.id,
+              });
+              console.log(`Deleted version ${version.name}`);
+            }
+          }
