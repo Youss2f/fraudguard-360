@@ -3,7 +3,7 @@ uvicorn==0.32.0
 pydantic==2.10.0
 pyjwt==2.10.0
 bcrypt==4.2.0
-confluent-kafka==2.5.3
+confluent-kafka==2.12.0
 neo4j==5.24.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
