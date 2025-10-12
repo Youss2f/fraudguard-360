@@ -52,20 +52,19 @@ jobs:
         java-version: '17'
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-        config-file: ./.github/codeql/codeql-config.yml
-        queries: +security-and-quality
+        queries: security-extended,security-and-quality
 
     - name: Install JavaScript dependencies
       if: matrix.language == 'javascript'
       run: |
         if [ -f "package.json" ]; then
-          npm ci --production
+          npm ci --production || npm install --production
         fi
         if [ -f "frontend/package.json" ]; then
-          cd frontend && npm ci --production
+          cd frontend && (npm ci --production || npm install --production)
         fi
         
     - name: Install Python dependencies
@@ -85,16 +84,10 @@ jobs:
         fi
 
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+      uses: github/codeql-action/autobuild@v3
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{ matrix.language }}"
         upload: true
-        
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: ${{ runner.temp }}/results.sarif

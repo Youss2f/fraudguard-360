@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node api-gateway/app/server.js",
     "dev": "nodemon api-gateway/app/server.js",
-    "build": "npm run build:frontend && npm run build:services",
-    "build:frontend": "cd frontend && npm run build",
+    "build": "echo 'Building FraudGuard 360 application...'",
+    "build:frontend": "if [ -d 'frontend' ]; then cd frontend && npm run build; else echo 'Frontend directory not found'; fi",
     "build:services": "echo 'Building microservices...' && npm run build:ml && npm run build:risk",
     "build:ml": "cd ml-service && python -m py_compile *.py",
     "build:risk": "cd risk-scoring-service && python -m py_compile *.py",

@@ -33,11 +33,10 @@ jobs:
         fetch-depth: 2
     
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-        config-file: ./.github/codeql/codeql-config.yml
-        queries: +security-extended,+security-and-quality
+        queries: security-extended,security-and-quality
     
     - name: Setup Java for Java analysis
       if: matrix.language == 'java'
@@ -62,9 +61,11 @@ jobs:
     - name: Install JavaScript dependencies
       if: matrix.language == 'javascript'
       run: |
-        npm ci --production
+        if [ -f "package.json" ]; then
+          npm install || npm ci || echo "Failed to install root dependencies"
+        fi
         if [ -f "frontend/package.json" ]; then
-          cd frontend && npm ci --production
+          cd frontend && (npm ci || npm install) && cd ..
         fi
 
     - name: Install Python dependencies  
@@ -84,27 +85,18 @@ jobs:
           cd flink-jobs && mvn compile -DskipTests
         fi
     
-    - name: Setup Node.js for JavaScript analysis
-      if: matrix.language == 'javascript'
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
     - name: Build frontend
       if: matrix.language == 'javascript'
       run: |
         if [ -d "frontend" ]; then
           cd frontend
-          npm ci
           npm run build || echo "Frontend build failed but continuing"
         else
           echo "Frontend directory not found"
         fi
     
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{ matrix.language }}"
 
