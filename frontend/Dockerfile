@@ -52,7 +52,7 @@ ENV REACT_APP_API_URL=$REACT_APP_API_URL \
 RUN node node_modules/react-scripts/bin/react-scripts.js build
 
 # Production Stage - Nginx web server
-FROM nginx:1.25-alpine as production
+FROM nginx:1.29-alpine as production
 
 # Install security updates and curl for health checks
 RUN apk update && apk upgrade && apk add --no-cache \
