@@ -5,7 +5,7 @@ neo4j==5.24.0
 redis==5.1.1
 python-multipart==0.0.19
 prometheus-client==0.21.0
-structlog==23.2.0
+structlog==25.4.0
 asyncio==3.4.3
 aioredis==2.0.1
 pytest==8.3.3
