@@ -123,7 +123,7 @@ jobs:
       
       # Upload coverage reports
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: ./api-gateway/coverage.xml,./frontend/coverage/lcov.info
           flags: unittests
