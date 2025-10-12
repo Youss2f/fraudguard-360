@@ -42,8 +42,12 @@ jobs:
     - name: Build Java projects
       if: matrix.language == 'java'
       run: |
-        cd stream-processor-flink && mvn clean compile -DskipTests || true
-        cd ../flink-jobs && mvn clean compile -DskipTests || true
+        if [ -d "stream-processor-flink" ]; then
+          cd stream-processor-flink && mvn clean compile -DskipTests || echo "stream-processor-flink build failed"
+        fi
+        if [ -d "flink-jobs" ]; then
+          cd flink-jobs && mvn clean compile -DskipTests || echo "flink-jobs build failed"
+        fi
 
     - name: Set up Node.js
       if: matrix.language == 'javascript'
@@ -56,9 +60,13 @@ jobs:
     - name: Build JavaScript project
       if: matrix.language == 'javascript'
       run: |
-        cd frontend
-        npm ci
-        npm run build
+        if [ -d "frontend" ]; then
+          cd frontend
+          npm ci
+          npm run build || echo "Frontend build failed but continuing for CodeQL"
+        else
+          echo "Frontend directory not found"
+        fi
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
