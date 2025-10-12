@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # Build Stage - Create optimized production bundle
-FROM node:18-alpine as builder
+FROM node:24-alpine as builder
 
 # Set build arguments
 ARG BUILD_DATE
