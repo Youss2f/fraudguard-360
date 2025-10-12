@@ -119,7 +119,7 @@ resource "random_password" "db_passwords" {
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  version = "~> 6.4"
 
   name = "${local.name_prefix}-vpc"
   cidr = var.vpc_cidr
