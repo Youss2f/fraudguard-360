@@ -1,0 +1,48 @@
+name: 'Setup Runtime Environment'
+description: 'Setup Node.js, Python, or Java environment for CodeQL analysis'
+
+inputs:
+  language:
+    description: 'Programming language (javascript, python, java)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      if: inputs.language == 'javascript'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Setup Python
+      if: inputs.language == 'python'
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Setup Java
+      if: inputs.language == 'java'
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install JavaScript dependencies
+      if: inputs.language == 'javascript'
+      shell: bash
+      run: |
+        if [ -f "package.json" ]; then
+          npm ci --production
+        fi
+        if [ -f "frontend/package.json" ]; then
+          cd frontend && npm ci --production
+        fi
+
+    - name: Install Python dependencies
+      if: inputs.language == 'python'
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        find . -name "requirements.txt" -exec pip install -r {} \; || echo "No requirements.txt found"

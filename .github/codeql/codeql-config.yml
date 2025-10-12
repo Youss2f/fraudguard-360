@@ -1,0 +1,68 @@
+name: "FraudGuard-360 CodeQL Configuration"
+
+disable-default-queries: false
+
+queries:
+  - name: security-extended
+    uses: security-extended
+  - name: security-and-quality
+    uses: security-and-quality
+
+query-filters:
+  - exclude:
+      id: 
+        - js/missing-rate-limiting
+        - js/clear-text-logging
+      reason: "These are handled by our custom middleware"
+
+paths-ignore:
+  - "node_modules"
+  - "dist"
+  - "build"
+  - "coverage"
+  - "frontend/build"
+  - "**/*.test.js"
+  - "**/*.spec.js"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/*.min.js"
+  - "scripts/build.sh"
+  - "scripts/deploy.sh"
+
+paths:
+  - "api-gateway"
+  - "core-ml-service"
+  - "ml-service" 
+  - "risk-scoring-service"
+  - "graph-analytics-service"
+  - "services"
+  - "shared"
+  - "frontend/src"
+  - "stream-processor-flink/src"
+  - "flink-jobs/src"
+
+# Language-specific configurations
+javascript:
+  # Include TypeScript files
+  identify-environment: true
+  # Custom queries for Node.js security
+  queries:
+    - name: nodejs-security
+      description: "Node.js specific security queries"
+      paths:
+        - ./codeql-custom-queries/nodejs
+
+python:
+  # Python package analysis
+  setup:
+    - "pip install -r requirements.txt"
+  queries:
+    - name: python-security
+      description: "Python security and data flow queries"
+
+java:
+  # Maven project configuration
+  build-mode: autobuild
+  queries:
+    - name: java-security
+      description: "Java security queries for Spring Boot"

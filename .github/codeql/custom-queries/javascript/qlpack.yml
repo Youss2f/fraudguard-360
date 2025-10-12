@@ -1,0 +1,8 @@
+name: Custom JavaScript Security Queries
+description: Custom CodeQL queries for JavaScript/Node.js security scanning
+version: 1.0.0
+
+queries:
+  - ql/hardcoded-credentials.ql
+  - ql/unsafe-json-parse.ql
+  - ql/missing-rate-limiting.ql
