@@ -1,0 +1,154 @@
+{
+  "test_users": [
+    {
+      "user_id": "test_user_001",
+      "username": "normal_user_1",
+      "email": "normal1@test.com",
+      "profile": {
+        "call_duration": 120.5,
+        "call_cost": 5.25,
+        "calls_per_day": 15,
+        "unique_numbers_called": 8,
+        "international_calls": 0,
+        "night_calls": 0,
+        "weekend_calls": 1,
+        "call_frequency_variance": 2.1,
+        "location_changes": 1,
+        "avg_call_gap": 1.8,
+        "network_connections": 5,
+        "suspicious_patterns": 0
+      },
+      "expected_fraud": false
+    },
+    {
+      "user_id": "test_user_002", 
+      "username": "fraud_user_1",
+      "email": "fraud1@test.com",
+      "profile": {
+        "call_duration": 300.8,
+        "call_cost": 25.75,
+        "calls_per_day": 85,
+        "unique_numbers_called": 18,
+        "international_calls": 1,
+        "night_calls": 1,
+        "weekend_calls": 1,
+        "call_frequency_variance": 15.2,
+        "location_changes": 8,
+        "avg_call_gap": 0.3,
+        "network_connections": 25,
+        "suspicious_patterns": 1
+      },
+      "expected_fraud": true
+    }
+  ],
+  "test_cdr_records": [
+    {
+      "user_id": "test_user_001",
+      "timestamp": "2024-01-15T10:30:00Z",
+      "call_duration": 125.0,
+      "destination": "+1234567890",
+      "call_type": "voice",
+      "cost": 5.50,
+      "location": "home",
+      "device_id": "device_001"
+    },
+    {
+      "user_id": "test_user_002",
+      "timestamp": "2024-01-15T02:15:00Z",
+      "call_duration": 450.0,
+      "destination": "+9876543210",
+      "call_type": "voice",
+      "cost": 45.00,
+      "location": "unknown",
+      "device_id": "device_002"
+    }
+  ],
+  "test_predictions": [
+    {
+      "user_id": "test_user_001",
+      "fraud_probability": 0.12,
+      "risk_score": 2.5,
+      "fraud_type": "none",
+      "confidence": 0.88,
+      "model_predictions": {
+        "random_forest": 0.08,
+        "gradient_boosting": 0.15,
+        "isolation_forest": 0.10,
+        "graph_sage": 0.14
+      },
+      "risk_factors": [],
+      "recommendation": "normal_monitoring"
+    },
+    {
+      "user_id": "test_user_002", 
+      "fraud_probability": 0.89,
+      "risk_score": 8.7,
+      "fraud_type": "subscription_fraud",
+      "confidence": 0.91,
+      "model_predictions": {
+        "random_forest": 0.92,
+        "gradient_boosting": 0.87,
+        "isolation_forest": 0.88,
+        "graph_sage": 0.89
+      },
+      "risk_factors": [
+        "unusual_call_patterns",
+        "high_international_usage", 
+        "rapid_location_changes",
+        "suspicious_network_behavior"
+      ],
+      "recommendation": "immediate_investigation"
+    }
+  ],
+  "test_alerts": [
+    {
+      "alert_id": "alert_001",
+      "user_id": "test_user_002",
+      "alert_type": "fraud_detected",
+      "severity": "high",
+      "timestamp": "2024-01-15T02:16:00Z",
+      "description": "Potential subscription fraud detected",
+      "fraud_probability": 0.89,
+      "risk_score": 8.7,
+      "recommended_actions": [
+        "suspend_account",
+        "manual_investigation",
+        "notify_security_team"
+      ]
+    }
+  ],
+  "test_metrics": {
+    "system_performance": {
+      "avg_response_time": 0.45,
+      "throughput": 150.0,
+      "error_rate": 0.02,
+      "uptime": 99.9
+    },
+    "fraud_detection": {
+      "accuracy": 0.94,
+      "precision": 0.89,
+      "recall": 0.91,
+      "f1_score": 0.90,
+      "false_positive_rate": 0.05
+    }
+  },
+  "test_configurations": {
+    "ml_models": {
+      "ensemble_weights": {
+        "random_forest": 0.3,
+        "gradient_boosting": 0.3,
+        "isolation_forest": 0.2,
+        "graph_sage": 0.2
+      },
+      "fraud_threshold": 0.5,
+      "confidence_threshold": 0.7
+    },
+    "monitoring": {
+      "alert_thresholds": {
+        "response_time": 2.0,
+        "error_rate": 0.05,
+        "fraud_rate": 0.15
+      }
+    }
+  }
+}

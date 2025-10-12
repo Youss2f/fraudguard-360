@@ -1,0 +1,55 @@
+# ==============================================================================
+# FraudGuard 360 - Helm Chart
+# Kubernetes application packaging and deployment automation
+# ==============================================================================
+
+apiVersion: v2
+name: fraudguard-360
+description: A comprehensive fraud detection platform with real-time analytics and ML-powered insights
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+# Metadata
+keywords:
+  - fraud-detection
+  - machine-learning
+  - real-time-analytics
+  - microservices
+  - kafka
+  - neo4j
+  - flink
+home: https://github.com/your-org/fraudguard-360
+sources:
+  - https://github.com/your-org/fraudguard-360
+maintainers:
+  - name: FraudGuard Team
+    email: team@fraudguard.com
+
+# Dependencies
+dependencies:
+  - name: postgresql
+    version: "12.1.9"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - database
+  
+  - name: kafka
+    version: "20.0.6"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+    tags:
+      - messaging
+  
+  - name: neo4j
+    version: "4.4.22"
+    repository: https://helm.neo4j.com/neo4j
+    condition: neo4j.enabled
+    tags:
+      - graph-database
+
+# Annotations
+annotations:
+  category: Analytics
+  licenses: Apache-2.0

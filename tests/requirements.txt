@@ -1,0 +1,60 @@
+# FraudGuard 360 - Testing Requirements
+# All dependencies needed for comprehensive testing
+
+# Core testing frameworks
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.3.0
+pytest-html>=3.2.0
+pytest-json-report>=1.5.0
+pytest-mock>=3.11.0
+
+# HTTP testing
+requests>=2.31.0
+httpx>=0.24.0
+responses>=0.23.0
+
+# Performance testing
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Security testing
+sqlparse>=0.4.4
+beautifulsoup4>=4.12.0
+
+# Async testing
+aiohttp>=3.8.0
+asyncio-mqtt>=0.13.0
+
+# Data validation
+pydantic>=2.0.0
+jsonschema>=4.18.0
+
+# Database testing
+psycopg2-binary>=2.9.0
+redis>=4.5.0
+neo4j>=5.9.0
+
+# Message queue testing (optional - for integration tests)
+# kafka-python>=2.0.2  # Commented out due to import issues
+pika>=1.3.0  # For RabbitMQ if used
+
+# Monitoring and metrics
+prometheus-client>=0.17.0
+
+# Mock and fixtures
+factory-boy>=3.3.0
+faker>=19.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+colorama>=0.4.6
+tqdm>=4.65.0
+
+# Development and debugging
+ipython>=8.14.0
+pdb++>=0.10.3

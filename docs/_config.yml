@@ -1,0 +1,48 @@
+# GitHub Pages Configuration for FraudGuard 360°
+title: "FraudGuard 360° - Telecom Fraud Detection System"
+description: "Next-generation telecom fraud detection prototype for Sentinel V2 platform"
+baseurl: "/fraudguard-360"
+url: "https://youss2f.github.io"
+
+# Build settings
+theme: minima
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Navigation
+header_pages:
+  - index.md
+  - architecture.md
+  - getting-started.md
+  - api-reference.md
+  - deployment.md
+  - performance.md
+  - contributing.md
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Site settings
+show_excerpts: true
+date_format: "%B %d, %Y"
+
+# Footer settings
+footer_content: "© 2025 Youssef ATERTOUR - 5th-year Computer Science and Network Engineering student"
+
+# Custom variables
+project:
+  version: "1.2.0"
+  language_distribution:
+    python: "53.1%"
+    java: "35.7%"
+    typescript: "11.2%"
+  performance:
+    detection_latency: "<5 seconds"
+    accuracy: "97.3%"
+    availability: "99.95%"

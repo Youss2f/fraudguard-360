@@ -1,0 +1,27 @@
+# FraudGuard 360° - Risk Scoring Service Dependencies
+# Advanced risk assessment algorithms
+
+# Core ML Libraries
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.10.0
+
+# API Framework
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+
+# Data Processing & Analytics
+redis>=4.5.0
+httpx>=0.24.0
+
+# System Monitoring
+psutil>=5.9.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Utilities
+python-dotenv>=1.0.0

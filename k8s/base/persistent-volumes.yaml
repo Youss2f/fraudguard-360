@@ -1,0 +1,136 @@
+# ==============================================================================
+# FraudGuard 360 - Persistent Volume Claims
+# Storage for databases and stateful services
+# ==============================================================================
+
+# PostgreSQL Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: postgres-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+# Neo4j Data Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neo4j-data-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: neo4j-data-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+# Neo4j Logs Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neo4j-logs-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: neo4j-logs-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# Kafka Data Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: kafka-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 15Gi
+  storageClassName: standard
+
+---
+# Zookeeper Data Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zookeeper-data-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: zookeeper-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# Flink Checkpoints and Savepoints Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: flink-data-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: flink-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+# ML Models Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: fraudguard
+  labels:
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: ml-models-storage
+    app.kubernetes.io/part-of: fraudguard-360
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard

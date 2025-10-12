@@ -1,0 +1,526 @@
+# FraudGuard 360 - Phase 11: Production Deployment & Go-Live
+# Complete production deployment configuration and operational readiness
+
+# This phase marks the completion of the FraudGuard 360 fraud detection platform
+# with comprehensive production deployment preparation and go-live readiness.
+
+version: '3.8'
+
+services:
+  # Production API Gateway
+  api-gateway-prod:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    image: fraudguard/api-gateway:latest
+    container_name: fraudguard-api-gateway-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - LOG_LEVEL=INFO
+      - NEO4J_URI=bolt://neo4j-prod:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD_FILE=/run/secrets/neo4j_password
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-prod:9092
+      - ML_SERVICE_URL=http://ml-service-prod:8001
+      - REDIS_URL=redis://redis-prod:6379
+      - PROMETHEUS_METRICS_PORT=9090
+    secrets:
+      - neo4j_password
+      - api_secret_key
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - neo4j-prod
+      - kafka-prod
+      - redis-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production ML Service
+  ml-service-prod:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    image: fraudguard/ml-service:latest
+    container_name: fraudguard-ml-service-prod
+    ports:
+      - "8001:8001"
+    environment:
+      - ENV=production
+      - LOG_LEVEL=INFO
+      - MODEL_PATH=/app/models/fraud_detection_model.pkl
+      - BATCH_SIZE=64
+      - MAX_WORKERS=4
+      - REDIS_URL=redis://redis-prod:6379
+      - PROMETHEUS_METRICS_PORT=9091
+    volumes:
+      - ml-models:/app/models
+      - ml-data:/app/data
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - redis-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Frontend
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: fraudguard/frontend:latest
+    container_name: fraudguard-frontend-prod
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=https://api.fraudguard.com
+      - REACT_APP_WS_URL=wss://api.fraudguard.com/ws
+      - REACT_APP_ENV=production
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - api-gateway-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Neo4j Database
+  neo4j-prod:
+    image: neo4j:5.13-enterprise
+    container_name: fraudguard-neo4j-prod
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/production_password
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_memory_heap_initial__size=2G
+      - NEO4J_dbms_memory_heap_max__size=4G
+      - NEO4J_dbms_memory_pagecache_size=2G
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
+      - NEO4J_dbms_connector_bolt_listen__address=0.0.0.0:7687
+      - NEO4J_dbms_connector_http_listen__address=0.0.0.0:7474
+    volumes:
+      - neo4j-data-prod:/data
+      - neo4j-logs-prod:/logs
+      - neo4j-import-prod:/var/lib/neo4j/import
+    networks:
+      - fraud-detection-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "production_password", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Kafka
+  kafka-prod:
+    image: confluentinc/cp-kafka:7.4.3
+    container_name: fraudguard-kafka-prod
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-prod:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-prod:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+    volumes:
+      - kafka-data-prod:/var/lib/kafka/data
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - zookeeper-prod
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Zookeeper
+  zookeeper-prod:
+    image: confluentinc/cp-zookeeper:7.4.3
+    container_name: fraudguard-zookeeper-prod
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 5
+      ZOOKEEPER_INIT_LIMIT: 10
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 60
+      ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: 3
+      ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: 24
+    volumes:
+      - zookeeper-data-prod:/var/lib/zookeeper/data
+      - zookeeper-logs-prod:/var/lib/zookeeper/log
+    networks:
+      - fraud-detection-network
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181", "|", "grep", "imok"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Redis
+  redis-prod:
+    image: redis:7.2-alpine
+    container_name: fraudguard-redis-prod
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass production_redis_password --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data-prod:/data
+    networks:
+      - fraud-detection-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "production_redis_password", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Flink Job Manager
+  flink-jobmanager-prod:
+    image: flink:1.18-scala_2.12
+    container_name: fraudguard-flink-jobmanager-prod
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager-prod
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 4
+        jobmanager.memory.process.size: 2048m
+        taskmanager.memory.process.size: 4096m
+        state.backend: rocksdb
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        execution.checkpointing.interval: 30000
+        execution.checkpointing.min-pause: 5000
+        web.timeout: 300000
+    volumes:
+      - flink-checkpoints:/opt/flink/checkpoints
+      - flink-savepoints:/opt/flink/savepoints
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - kafka-prod
+      - neo4j-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Flink Task Manager
+  flink-taskmanager-prod:
+    image: flink:1.18-scala_2.12
+    container_name: fraudguard-flink-taskmanager-prod
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager-prod
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 4
+        taskmanager.memory.process.size: 4096m
+    volumes:
+      - flink-checkpoints:/opt/flink/checkpoints
+      - flink-savepoints:/opt/flink/savepoints
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - flink-jobmanager-prod
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 5G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # Production Nginx Load Balancer
+  nginx-prod:
+    image: nginx:1.25-alpine
+    container_name: fraudguard-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    networks:
+      - fraud-detection-network
+    depends_on:
+      - api-gateway-prod
+      - frontend-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
+
+# Production Volumes
+volumes:
+  neo4j-data-prod:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/neo4j
+  neo4j-logs-prod:
+    driver: local
+  neo4j-import-prod:
+    driver: local
+  kafka-data-prod:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/kafka
+  zookeeper-data-prod:
+    driver: local
+  zookeeper-logs-prod:
+    driver: local
+  redis-data-prod:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/redis
+  flink-checkpoints:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/flink/checkpoints
+  flink-savepoints:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/flink/savepoints
+  ml-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/ml-models
+  ml-data:
+    driver: local
+  nginx-logs:
+    driver: local
+
+# Production Network
+networks:
+  fraud-detection-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Production Secrets
+secrets:
+  neo4j_password:
+    external: true
+  api_secret_key:
+    external: true

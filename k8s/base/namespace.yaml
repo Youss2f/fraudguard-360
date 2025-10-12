@@ -1,0 +1,19 @@
+# ==============================================================================
+# FraudGuard 360 - Kubernetes Namespace
+# Isolated environment for all FraudGuard services
+# ==============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fraudguard
+  labels:
+    name: fraudguard
+    app.kubernetes.io/name: fraudguard-360
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: fraudguard-360
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    description: "FraudGuard 360 - Real-time fraud detection platform"
+    contact: "team@fraudguard.com"

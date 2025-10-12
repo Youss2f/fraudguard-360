@@ -1,0 +1,11 @@
+# Security Testing Requirements and Dependencies
+requests>=2.28.0
+urllib3>=1.26.0
+certifi>=2022.9.24
+pysocks>=1.7.1
+
+# Additional security testing tools (optional but recommended)
+# Install separately as needed:
+# pip install python-nmap  # for network scanning
+# pip install bandit       # for static code analysis
+# pip install safety       # for dependency vulnerability scanning

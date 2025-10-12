@@ -1,0 +1,5 @@
+execution.checkpointing.interval: 60000
+state.backend: rocksdb
+state.checkpoints.dir: file:///checkpoints
+taskmanager.memory.process.size: 4g
+parallelism.default: 4

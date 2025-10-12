@@ -1,0 +1,20 @@
+# Security rules for OWASP ZAP scanning
+# Format: rule_id	WARN|IGNORE	URL_REGEX	PARAMETER	DESCRIPTION
+
+# Ignore false positives for health check endpoints
+10021	IGNORE	.*/health.*	.*	Health check endpoints are expected to be simple
+
+# Ignore CSRF warnings for API endpoints (handled by JWT)
+10202	IGNORE	.*/api/.*	.*	CSRF handled by JWT tokens
+
+# Ignore cookie warnings for stateless API
+10054	IGNORE	.*/api/.*	.*	Stateless API using JWT tokens
+
+# Monitor for SQL injection attempts
+40018	WARN	.*	.*	Monitor SQL injection attempts
+
+# Monitor for XSS attempts  
+40012	WARN	.*	.*	Monitor XSS attempts
+
+# Monitor for authentication bypass
+40013	WARN	.*	.*	Monitor authentication bypass attempts

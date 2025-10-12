@@ -1,0 +1,79 @@
+filebeat.inputs:
+- type: container
+  paths:
+    - '/var/lib/docker/containers/*/*.log'
+  processors:
+    - add_docker_metadata:
+        host: "unix:///var/run/docker.sock"
+    - decode_json_fields:
+        fields: ["message"]
+        target: ""
+        overwrite_keys: true
+    - add_fields:
+        target: fraudguard
+        fields:
+          environment: production
+          cluster: main
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/fraudguard/*.log
+  fields:
+    service: fraudguard
+    environment: production
+  fields_under_root: true
+  multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+  multiline.negate: true
+  multiline.match: after
+
+processors:
+- add_host_metadata:
+    when.not.contains.tags: forwarded
+
+- drop_fields:
+    fields: ["agent", "ecs", "host.architecture", "host.os", "input"]
+
+- script:
+    lang: javascript
+    source: >
+      function process(event) {
+        var message = event.Get("message");
+        if (message) {
+          try {
+            var json = JSON.parse(message);
+            if (json.timestamp) {
+              event.Put("@timestamp", new Date(json.timestamp));
+            }
+            if (json.level) {
+              event.Put("log.level", json.level);
+            }
+            if (json.service) {
+              event.Put("service.name", json.service);
+            }
+            if (json.trace_id) {
+              event.Put("trace.id", json.trace_id);
+            }
+            if (json.fraud_detection) {
+              event.Put("fraudguard.detection", json.fraud_detection);
+            }
+          } catch (err) {
+            // Not JSON, keep as is
+          }
+        }
+      }
+
+output.logstash:
+  hosts: ["logstash:5000"]
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+setup.template.settings:
+  index.number_of_shards: 1
+  index.codec: best_compression

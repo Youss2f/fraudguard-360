@@ -1,0 +1,20 @@
+# FraudGuard 360° - Graph Analytics Service Dependencies
+# Neo4j-powered fraud network analysis
+
+# Graph Database & Analytics
+neo4j>=5.8.0
+networkx>=3.1
+numpy>=1.24.0
+pandas>=2.0.0
+
+# API Framework
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Utilities
+python-dotenv>=1.0.0

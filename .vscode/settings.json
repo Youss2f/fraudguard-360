@@ -1,0 +1,4 @@
+{
+    "augment.advanced": {},
+    "java.compile.nullAnalysis.mode": "automatic"
+}
