@@ -17,7 +17,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.18.1</flink.version>
+        <flink.version>2.1.0</flink.version>
         <kafka.version>3.8.0</kafka.version>
         <neo4j.version>5.15.0</neo4j.version>
         <jackson.version>2.17.2</jackson.version>
