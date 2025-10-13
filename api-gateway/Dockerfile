@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # Build Stage - Install dependencies and prepare application
-FROM python:3.11-slim as builder
+FROM python:3.11-alpine-slim as builder
 
 # Set build arguments
 ARG BUILD_DATE
@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Production Stage - Minimal runtime environment
-FROM python:3.11-slim as production
+FROM python:3.11-alpine-slim as production
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y \

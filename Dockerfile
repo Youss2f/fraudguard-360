@@ -3,7 +3,7 @@
 # Multi-service container for API Gateway and Frontend
 # ==============================================================================
 
-FROM node:18-alpine as frontend-builder
+FROM node:18-alpine-alpine as frontend-builder
 
 # Build frontend
 WORKDIR /app/frontend
@@ -13,7 +13,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Production image
-FROM node:18-alpine
+FROM node:18-alpine-alpine
 
 # Install Python for API Gateway
 RUN apk add --no-cache python3 py3-pip
