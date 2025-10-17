@@ -72,8 +72,8 @@ def cleanup_all_failed_workflows(repo_owner: str, repo_name: str, token: str) ->
     print(f"Total pages processed: {page - 1}")
     print(f"Total workflow runs deleted: {total_deleted}")
 
-def cleanup_all_workflow_runs(repo_owner: str, repo_name: str, token: str) -> None:
-    """Clean up ALL workflow runs (including successful ones with emojis)"""
+def cleanup_all_workflow_runs_complete(repo_owner: str, repo_name: str, token: str) -> None:
+    """Clean up ALL workflow runs regardless of status"""
     
     headers = {
         'Authorization': f'token {token}',
@@ -101,34 +101,26 @@ def cleanup_all_workflow_runs(repo_owner: str, repo_name: str, token: str) -> No
                 
             print(f"Processing page {page}: Found {len(runs)} workflow runs")
             
-            # Delete runs that contain emojis or are failed
+            # Delete ALL runs
             for run in runs:
                 run_id = run['id']
                 run_name = run.get('name', 'Unknown')
                 status = run.get('status', 'unknown')
                 conclusion = run.get('conclusion', 'unknown')
                 
-                # Check if run name contains emojis or if it's failed
-                should_delete = (
-                    conclusion == 'failure' or
-                    status == 'completed' and conclusion != 'success' or
-                    any(ord(char) > 127 for char in run_name)  # Contains non-ASCII (emoji) characters
-                )
+                delete_url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/actions/runs/{run_id}'
                 
-                if should_delete:
-                    delete_url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/actions/runs/{run_id}'
-                    
-                    delete_response = requests.delete(delete_url, headers=headers)
-                    if delete_response.status_code == 204:
-                        total_deleted += 1
-                        print(f"Deleted workflow run #{run_id} - {run_name} ({conclusion})")
-                    elif delete_response.status_code == 403:
-                        print(f"Permission denied for run #{run_id}")
-                    else:
-                        print(f"Failed to delete run #{run_id}: {delete_response.status_code}")
-                    
-                    # Rate limiting
-                    time.sleep(0.1)
+                delete_response = requests.delete(delete_url, headers=headers)
+                if delete_response.status_code == 204:
+                    total_deleted += 1
+                    print(f"Deleted workflow run #{run_id} - {run_name} ({conclusion})")
+                elif delete_response.status_code == 403:
+                    print(f"Permission denied for run #{run_id}")
+                else:
+                    print(f"Failed to delete run #{run_id}: {delete_response.status_code}")
+                
+                # Rate limiting
+                time.sleep(0.1)
             
             page += 1
             
@@ -151,13 +143,10 @@ if __name__ == "__main__":
     REPO_NAME = "fraudguard-360"
     TOKEN = input("Enter GitHub token: ") or "your-github-token-here"
     
-    print("GitHub Actions Complete Cleanup - Professional Repository Maintenance")
+    print("GitHub Actions COMPLETE Cleanup - Remove ALL Workflow History")
     print("=" * 70)
     
-    print("\nPhase 1: Cleaning up ALL failed workflow runs...")
-    cleanup_all_failed_workflows(REPO_OWNER, REPO_NAME, TOKEN)
+    print("\nRemoving ALL workflow runs to eliminate polishing commit history...")
+    cleanup_all_workflow_runs_complete(REPO_OWNER, REPO_NAME, TOKEN)
     
-    print("\nPhase 2: Cleaning up runs with emojis and non-professional formatting...")
-    cleanup_all_workflow_runs(REPO_OWNER, REPO_NAME, TOKEN)
-    
-    print("\nComplete cleanup finished. Repository status restored to 100% professional standards.")
+    print("\nComplete cleanup finished. All workflow history removed.")
