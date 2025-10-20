@@ -33,7 +33,7 @@ structlog==23.2.0              # Secure structured logging
 python-json-logger==2.0.7     # JSON logging formatter
 
 # Middleware & CORS
-starlette==0.36.3              # Secure ASGI toolkit
+starlette==0.35.1              # Secure ASGI toolkit - compatible with FastAPI 0.109.0
 
 # Configuration & Environment
 python-dotenv==1.0.0           # Secure environment management
@@ -45,7 +45,7 @@ orjson==3.9.0                # Secure JSON serialization
 msgpack==1.0.8                 # Secure binary serialization
 
 # Development & Testing
-pytest==8.0.0                  # Secure testing framework
+pytest==7.4.4                  # Compatible with pytest-asyncio
 pytest-asyncio==0.23.4        # Secure async testing
 pytest-httpx==0.30.0          # Secure HTTP testing
 httpx-oauth==0.14.0            # Secure OAuth testing
