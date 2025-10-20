@@ -8,7 +8,7 @@ pydantic==2.5.3               # Secure data validation
 python-multipart==0.0.9      # Fixed DoS vulnerability CVE-2024-51749
 
 # HTTP Client & Networking - SECURITY FIXED
-httpx==0.26.0                  # Secure async HTTP client
+httpx==0.27.2                   # Secure HTTP client - compatible with pytest-httpx
 websockets==12.0               # Secure WebSocket support
 
 # Authentication & Security - SECURITY FIXED
