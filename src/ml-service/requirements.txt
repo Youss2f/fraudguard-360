@@ -33,7 +33,7 @@ python-jose[cryptography]==3.3.0  # Fixed JWT vulnerabilities
 bcrypt==4.1.2                  # Secure version
 
 # Development & Testing
-pytest==8.0.0                  # Secure version
+pytest==7.4.4                  # Compatible with pytest-asyncio 
 pytest-asyncio==0.23.4        # Secure version
 pytest-cov==4.0.0             # Secure version
 black==24.1.0                 # Secure version
