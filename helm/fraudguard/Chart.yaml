@@ -1,0 +1,17 @@
+apiVersion: v2
+name: fraudguard-360
+description: A Helm chart for FraudGuard-360 Fraud Detection System
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - fraud-detection
+  - microservices
+  - kafka
+  - ml
+maintainers:
+  - name: FraudGuard Team
+    email: team@fraudguard.io
+home: https://github.com/Youss2f/fraudguard-360
+sources:
+  - https://github.com/Youss2f/fraudguard-360

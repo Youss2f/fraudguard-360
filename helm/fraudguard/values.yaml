@@ -1,0 +1,141 @@
+# Default values for fraudguard-360
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  namespace: fraudguard
+  environment: production
+  imageRegistry: ghcr.io
+  imageOwner: youss2f
+
+# API Gateway configuration
+apiGateway:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: fraudguard-api-gateway
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 8000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# Risk Scoring Service configuration
+riskScoringService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fraudguard-risk-scoring-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+  probes:
+    liveness:
+      path: /metrics
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /metrics
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# ML Service configuration
+mlService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: fraudguard-ml-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# Kafka configuration
+kafka:
+  bootstrapServers: "kafka:9092"
+
+# Redis configuration
+redis:
+  host: "redis"
+  port: 6379
+
+# PostgreSQL configuration
+postgres:
+  host: "postgres"
+  database: "fraudguard"
+  user: "fraudguard_user"
+  # password should be provided via --set or separate secrets file
+  password: "change-in-production"
+
+# Neo4j configuration
+neo4j:
+  uri: "bolt://neo4j:7687"
+  user: "neo4j"
+  # password should be provided via --set or separate secrets file
+  password: "change-in-production"
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+  grafana:
+    enabled: false
+    port: 3000
