@@ -64,3 +64,6 @@ aiofiles==23.2.1               # Secure async file operations
 # Service Discovery & Load Balancing
 python-consul==1.1.0          # Consul service discovery (optional)
 etcd3==0.12.0                  # etcd service discovery (optional)
+
+# Message Streaming
+kafka-python==2.0.2            # Apache Kafka client for Python
