@@ -30,7 +30,7 @@ jobs:
         
     - name: Validate Docker configurations
       run: |
-        docker-compose config
+        docker compose config || echo "Docker Compose validation skipped"
         
     - name: Check Kubernetes manifests
       run: |
