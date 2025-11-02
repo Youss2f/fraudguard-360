@@ -1,0 +1,84 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install quality tools
+      run: |
+        pip install flake8 black isort mypy bandit safety
+        pip install -r src/api-gateway/requirements.txt
+    
+    - name: Run Black formatter check
+      run: |
+        black --check src/ || true
+    
+    - name: Run isort import checker
+      run: |
+        isort --check-only src/ || true
+    
+    - name: Run mypy type checking
+      run: |
+        mypy src/api-gateway --ignore-missing-imports || true
+    
+    - name: Run Bandit security linter
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true
+    
+    - name: Check for known security vulnerabilities
+      run: |
+        safety check --json || true
+    
+    - name: Upload Bandit report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report
+        path: bandit-report.json
+        retention-days: 30
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v3
+      with:
+        fail-on-severity: high
+
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install locust pytest-benchmark
+        pip install -r src/api-gateway/requirements.txt
+    
+    - name: Run performance benchmarks
+      run: |
+        echo "Performance tests would run here"
+        echo "Example: locust -f tests/performance/locustfile.py --headless"

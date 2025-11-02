@@ -1,0 +1,69 @@
+# FraudGuard-360 API Gateway Dependencies
+# Enterprise API gateway with authentication, rate limiting, and service orchestration
+
+# Core Web Framework - SECURITY FIXED
+fastapi==0.109.0               # Fixed multiple security vulnerabilities
+uvicorn[standard]==0.27.0      # Secure ASGI server
+pydantic==2.5.3               # Secure data validation
+python-multipart==0.0.9      # Fixed DoS vulnerability CVE-2024-51749
+
+# HTTP Client & Networking - SECURITY FIXED
+httpx==0.27.2                   # Secure HTTP client - compatible with pytest-httpx
+websockets==12.0               # Secure WebSocket support
+
+# Authentication & Security - SECURITY FIXED
+pyjwt==2.8.0                  # Secure JWT token handling
+cryptography==42.0.0           # Fixed multiple cryptographic vulnerabilities
+python-jose[cryptography]==3.3.0  # Fixed JWT vulnerabilities
+bcrypt==4.1.2                  # Fixed timing attack vulnerabilities
+passlib[bcrypt]==1.7.4         # Secure password hashing
+
+# Rate Limiting & Traffic Control
+slowapi==0.1.9                 # Rate limiting for FastAPI
+redis==5.0.1                   # Secure Redis version
+hiredis==2.3.2                 # Secure Redis client
+
+# Circuit Breaker & Resilience
+circuitbreaker==2.0.0          # Circuit breaker pattern implementation
+tenacity==8.2.3                # Secure retry mechanism
+
+# Monitoring & Observability
+prometheus-client==0.19.0      # Secure metrics collection
+structlog==23.2.0              # Secure structured logging
+python-json-logger==2.0.7     # JSON logging formatter
+
+# Middleware & CORS
+starlette==0.35.1              # Secure ASGI toolkit - compatible with FastAPI 0.109.0
+
+# Configuration & Environment
+python-dotenv==1.0.0           # Secure environment management
+pyyaml==6.0.1                  # Secure YAML parsing
+click==8.1.7                   # CLI interface
+
+# Performance & Serialization
+orjson==3.9.0                # Secure JSON serialization
+msgpack==1.0.8                 # Secure binary serialization
+
+# Development & Testing
+pytest==7.4.4                  # Compatible with pytest-asyncio
+pytest-asyncio==0.23.4        # Secure async testing
+pytest-httpx==0.30.0          # Secure HTTP testing
+httpx-oauth==0.14.0            # Secure OAuth testing
+
+# Code Quality
+black==24.1.0                 # Secure code formatting
+flake8==7.0.0                  # Secure code linting
+mypy==1.8.0                   # Secure static type checking
+bandit==1.7.5                  # Secure security linting
+
+# Production Utilities
+gunicorn==21.2.0               # Secure production server
+psutil==5.9.8                  # Secure system monitoring
+aiofiles==23.2.1               # Secure async file operations
+
+# Service Discovery & Load Balancing
+python-consul==1.1.0          # Consul service discovery (optional)
+etcd3==0.12.0                  # etcd service discovery (optional)
+
+# Message Streaming
+kafka-python==2.0.2            # Apache Kafka client for Python

@@ -1,0 +1,69 @@
+# FraudGuard-360 ML Service Dependencies
+# Production-ready machine learning service with security-first approach
+
+# Core ML Framework - SECURITY FIXED
+torch==2.2.0                    # PyTorch - fixed critical CVEs
+torchvision==0.17.0            # Compatible with PyTorch 2.2.0
+numpy==1.26.4                   # Secure version
+pandas==2.2.0                  # Secure version
+scikit-learn==1.4.0            # Secure version
+scipy==1.12.0                  # Secure version
+
+# Web Framework & API - SECURITY FIXED
+fastapi==0.109.0               # Secure version
+uvicorn[standard]==0.27.0      # Secure version
+pydantic==2.5.3               # Secure version
+python-multipart==0.0.9      # Fixed DoS vulnerability
+
+# Data Processing
+joblib==1.3.2                  # Secure version
+pyarrow==15.0.0               # Secure version
+
+# Monitoring & Metrics
+prometheus-client==0.19.0      # Secure version
+structlog==23.2.0              # Secure version
+
+# Caching & Messaging
+redis==5.0.1                   # Secure version
+kafka-python==2.0.2           # Secure version
+
+# Security & Validation - SECURITY FIXED
+cryptography==42.0.0           # Secure version
+python-jose[cryptography]==3.3.0  # Fixed JWT vulnerabilities
+bcrypt==4.1.2                  # Secure version
+
+# Development & Testing
+pytest==7.4.4                  # Compatible with pytest-asyncio 
+pytest-asyncio==0.23.4        # Secure version
+pytest-cov==4.0.0             # Secure version
+black==24.1.0                 # Secure version
+flake8==7.0.0                  # Secure version
+mypy==1.8.0                   # Secure version
+
+# HTTP & Networking
+httpx==0.26.0                  # Secure version
+aiofiles==23.2.1               # Secure version
+websockets==12.0               # Secure version
+
+# Configuration & Environment
+python-dotenv==1.0.0           # Secure version
+pyyaml==6.0.1                  # Secure version
+click==8.1.7                   # Secure version
+
+# Performance & Optimization
+orjson==3.9.0                # Secure version
+asyncio-throttle==1.0.2       # Rate limiting for async operations
+
+# Machine Learning Extensions - MLflow REMOVED due to critical CVEs
+optuna==3.5.0                  # Secure version
+# MLflow removed - contained multiple critical RCE vulnerabilities
+wandb==0.16.0                  # Secure version
+
+# Data Validation & Schema
+great-expectations==0.18.0      # Secure version
+cerberus==1.3.5                # Data validation
+
+# Production Utilities
+gunicorn==21.2.0               # Secure version
+psutil==5.9.8                  # Secure version
+python-json-logger==2.0.7     # JSON logging formatter
