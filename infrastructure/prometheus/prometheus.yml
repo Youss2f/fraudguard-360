@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'fraudguard-360'
+    environment: 'development'
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+        labels:
+          service: 'api-gateway'
+    metrics_path: '/metrics'
+
+  - job_name: 'risk-scoring-service'
+    static_configs:
+      - targets: ['risk-scoring-service:8001']
+        labels:
+          service: 'risk-scoring-service'
+    metrics_path: '/metrics'
+
+  - job_name: 'ml-service'
+    static_configs:
+      - targets: ['ml-service:8000']
+        labels:
+          service: 'ml-service'
+    metrics_path: '/metrics'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'

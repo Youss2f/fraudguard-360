@@ -1,0 +1,59 @@
+# FraudGuard-360 ML Service Dependencies
+# Security-hardened versions - Last updated: December 2025
+
+# Use CPU-only PyTorch wheels (saves ~3GB vs CUDA version)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Core ML Framework - SECURITY PATCHED
+torch==2.5.1
+torchvision==0.20.1
+numpy==2.2.1
+pandas==2.2.3
+scikit-learn==1.6.0
+scipy==1.15.0
+
+# Web Framework & API - SECURITY PATCHED
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+# starlette managed by FastAPI dependency
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+
+# Data Processing
+joblib==1.4.2
+pyarrow==18.1.0
+
+# Monitoring & Metrics
+prometheus-client==0.21.1
+structlog==24.4.0
+
+# Caching & Messaging
+redis==5.2.1
+kafka-python==2.0.2
+
+# Security & Validation - SECURITY PATCHED
+cryptography==44.0.0
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+
+# Development & Testing
+pytest==8.3.4
+pytest-asyncio==0.25.2
+pytest-cov==6.0.0
+black==24.10.0
+flake8==7.1.1
+mypy==1.14.0
+
+# HTTP & Networking
+httpx==0.28.1
+aiofiles==24.1.0
+websockets==14.1
+
+# Configuration & Environment
+python-dotenv==1.0.1
+pyyaml==6.0.2
+
+# SECURITY NOTE: MLflow REMOVED due to critical RCE vulnerabilities
+# CVE-2024-37057, CVE-2025-1474, CVE-2024-37060, CVE-2025-1473
+# CVE-2024-37056, CVE-2024-37059, CVE-2025-52967, CVE-2024-37053
