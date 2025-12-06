@@ -28,56 +28,7 @@ FraudGuard-360 is a cloud-native fraud detection platform engineered for financi
 
 FraudGuard-360 implements an **Event-Driven Microservices** architecture using Apache Kafka as the central nervous system for asynchronous communication between loosely-coupled services.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              EXTERNAL LAYER                                  │
-│  ┌─────────────┐                                                            │
-│  │   Clients   │──HTTPS──▶ Load Balancer (Nginx Ingress)                   │
-│  └─────────────┘                        │                                   │
-└─────────────────────────────────────────┼───────────────────────────────────┘
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              API GATEWAY LAYER                               │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  API Gateway (FastAPI) :8000                                         │   │
-│  │  • JWT Authentication    • Rate Limiting    • Circuit Breaker        │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────┼───────────────────────────────────┘
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           EVENT STREAMING LAYER                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  Apache Kafka                                                        │   │
-│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐      │   │
-│  │  │ raw-transactions│  │scored-transactions│ │  fraud-alerts   │      │   │
-│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘      │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────┼───────────────────────────────────┘
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            PROCESSING LAYER                                  │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                 │
-│  │ Risk Scoring   │  │   ML Service   │  │ Graph Analytics│                 │
-│  │ Service :8001  │  │     :8002      │  │     :8003      │                 │
-│  │                │  │                │  │                │                 │
-│  │ • Rule Engine  │  │ • PyTorch NN   │  │ • Neo4j Driver │                 │
-│  │ • Velocity     │  │ • Feature Eng  │  │ • Pattern Det  │                 │
-│  │ • Thresholds   │  │ • Inference    │  │ • Link Analysis│                 │
-│  └────────────────┘  └────────────────┘  └────────────────┘                 │
-└─────────────────────────────────────────┼───────────────────────────────────┘
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            PERSISTENCE LAYER                                 │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                 │
-│  │  PostgreSQL    │  │     Redis      │  │     Neo4j      │                 │
-│  │    :5432       │  │     :6379      │  │     :7687      │                 │
-│  │                │  │                │  │                │                 │
-│  │ • Transactions │  │ • Session Cache│  │ • Customer     │                 │
-│  │ • Audit Logs   │  │ • Rate Limits  │  │   Relationships│                 │
-│  │ • Risk Rules   │  │ • Velocity Data│  │ • Merchant Net │                 │
-│  └────────────────┘  └────────────────┘  └────────────────┘                 │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![System Architecture](docs/architecture/images/figure_3_1_global_architecture.png)
 
 ### Design Patterns
 
@@ -97,6 +48,32 @@ FraudGuard-360 implements an **Event-Driven Microservices** architecture using A
 4. **Aggregation:** Scores combined with weighted ensemble
 5. **Decision:** Final verdict (APPROVE/REVIEW/DECLINE) published to `scored-transactions`
 6. **Alerting:** High-risk transactions trigger `fraud-alerts` for real-time notification
+
+---
+
+## ML & Data Pipeline
+
+The machine learning engine powers real-time fraud detection with state-of-the-art deep learning models and comprehensive feature engineering.
+
+![ML Architecture](docs/architecture/images/figure_3_3_ai_engine_architecture.png)
+
+### ML Pipeline Components
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Feature Engineering** | NumPy, Pandas | 15+ engineered features from raw transaction data |
+| **Model Architecture** | PyTorch | Deep neural network with attention mechanisms |
+| **Inference Engine** | FastAPI + ONNX | Sub-50ms real-time predictions |
+| **Model Registry** | Internal versioning | A/B testing and rollback capabilities |
+
+### Model Performance
+
+| Metric | Value |
+|--------|-------|
+| **Fraud Detection Rate** | 97.2% |
+| **False Positive Rate** | < 2% |
+| **Inference Latency** | < 50ms P99 |
+| **Model Refresh** | Daily retraining pipeline |
 
 ---
 
