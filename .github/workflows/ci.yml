@@ -182,11 +182,14 @@ jobs:
       matrix:
         include:
           - service: api-gateway
-            context: ./src/api-gateway
+            context: ./src
+            dockerfile: ./src/api-gateway/Dockerfile
           - service: ml-service
-            context: ./src/ml-service
+            context: ./src
+            dockerfile: ./src/ml-service/Dockerfile
           - service: risk-scoring-service
-            context: ./src/risk-scoring-service
+            context: ./src
+            dockerfile: ./src/risk-scoring-service/Dockerfile
 
     steps:
       - name: Checkout code
@@ -203,11 +206,11 @@ jobs:
       - name: Check if Dockerfile exists
         id: check-dockerfile
         run: |
-          if [ -f "${{ matrix.context }}/Dockerfile" ]; then
+          if [ -f "${{ matrix.dockerfile }}" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Dockerfile not found at ${{ matrix.context }}/Dockerfile"
+            echo "Dockerfile not found at ${{ matrix.dockerfile }}"
           fi
 
       # Login only when pushing (main branch, not PRs)
@@ -231,6 +234,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.OWNER_LC }}/fraudguard-${{ matrix.service }}:latest
@@ -246,6 +250,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: false
           load: true
           tags: fraudguard-${{ matrix.service }}:test
