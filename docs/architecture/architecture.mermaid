@@ -1,0 +1,126 @@
+%% FraudGuard-360 System Architecture
+%% This diagram describes the data flow from API Gateway through the fraud detection pipeline
+
+flowchart TB
+    subgraph External["External Layer"]
+        Client["Client Applications<br/>(Web, Mobile, API)"]
+        LB["Load Balancer<br/>(Nginx Ingress)"]
+    end
+
+    subgraph Gateway["API Gateway Layer"]
+        AG["API Gateway<br/>(FastAPI)<br/>Port: 8000"]
+        Auth["JWT Authentication<br/>+ Rate Limiting"]
+        Circuit["Circuit Breaker<br/>(Resilience)"]
+    end
+
+    subgraph Messaging["Event Streaming Layer"]
+        Kafka["Apache Kafka<br/>Port: 9092"]
+        RawTopic["raw-transactions<br/>topic"]
+        ScoredTopic["scored-transactions<br/>topic"]
+        AlertTopic["fraud-alerts<br/>topic"]
+    end
+
+    subgraph Processing["Processing Layer"]
+        Risk["Risk Scoring Service<br/>(FastAPI)<br/>Port: 8001"]
+        ML["ML Service<br/>(PyTorch + FastAPI)<br/>Port: 8002"]
+        Graph["Graph Analytics<br/>(Neo4j Driver)<br/>Port: 8003"]
+        Stream["Stream Processor<br/>(Kafka Consumer)"]
+    end
+
+    subgraph Cache["Caching Layer"]
+        Redis["Redis<br/>Port: 6379"]
+        VelocityCache["Velocity Cache<br/>(Rate Limiting)"]
+        SessionCache["Session Cache<br/>(Auth Tokens)"]
+    end
+
+    subgraph Data["Persistence Layer"]
+        PG["PostgreSQL<br/>Port: 5432"]
+        Neo4j["Neo4j Graph DB<br/>Port: 7687"]
+        TxTable["transactions"]
+        RulesTable["risk_rules"]
+        GraphData["Customer-Merchant<br/>Relationships"]
+    end
+
+    subgraph Monitoring["Observability Layer"]
+        Prom["Prometheus<br/>Port: 9090"]
+        Grafana["Grafana<br/>Port: 3000"]
+        Metrics["Service Metrics"]
+    end
+
+    %% External Flow
+    Client -->|HTTPS| LB
+    LB -->|Route| AG
+
+    %% Gateway Processing
+    AG --> Auth
+    Auth --> Circuit
+    Circuit -->|Validate| Redis
+
+    %% Async Event Flow (Primary Path)
+    AG -->|"1. Publish Transaction"| Kafka
+    Kafka --> RawTopic
+    RawTopic -->|"2. Consume"| Stream
+    
+    %% Parallel Processing
+    Stream -->|"3a. Score Request"| Risk
+    Stream -->|"3b. ML Inference"| ML
+    Stream -->|"3c. Graph Query"| Graph
+
+    %% Risk Engine Processing
+    Risk -->|"Velocity Check"| Redis
+    Risk -->|"Rule Lookup"| PG
+    Risk --> VelocityCache
+
+    %% ML Processing
+    ML -->|"Feature Cache"| Redis
+
+    %% Graph Processing
+    Graph -->|"Relationship Query"| Neo4j
+    Neo4j --> GraphData
+
+    %% Result Aggregation
+    Risk -->|"4. Risk Score"| Stream
+    ML -->|"4. ML Score"| Stream
+    Graph -->|"4. Graph Score"| Stream
+    
+    %% Final Decision
+    Stream -->|"5. Combined Score"| ScoredTopic
+    ScoredTopic -->|"High Risk"| AlertTopic
+
+    %% Sync Response (Secondary Path)
+    Circuit -->|"Sync /v1/fraud/detect"| Risk
+    Circuit -->|"Sync /v1/fraud/detect"| ML
+    
+    %% Persistence
+    Stream -->|"6. Store Result"| PG
+    PG --> TxTable
+    PG --> RulesTable
+
+    %% Monitoring
+    AG -.->|Metrics| Prom
+    Risk -.->|Metrics| Prom
+    ML -.->|Metrics| Prom
+    Stream -.->|Metrics| Prom
+    Prom --> Metrics
+    Prom --> Grafana
+
+    %% Response Path
+    Risk -->|"7. Response"| AG
+    AG -->|"8. JSON Response"| Client
+
+    %% Styling
+    classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef gateway fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef messaging fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef processing fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef cache fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef data fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef monitoring fill:#fafafa,stroke:#616161,stroke-width:2px
+
+    class Client,LB external
+    class AG,Auth,Circuit gateway
+    class Kafka,RawTopic,ScoredTopic,AlertTopic messaging
+    class Risk,ML,Graph,Stream processing
+    class Redis,VelocityCache,SessionCache cache
+    class PG,Neo4j,TxTable,RulesTable,GraphData data
+    class Prom,Grafana,Metrics monitoring
