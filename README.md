@@ -5,7 +5,7 @@
 [![CI Pipeline](https://github.com/Youss2f/fraudguard-360/actions/workflows/ci.yml/badge.svg)](https://github.com/Youss2f/fraudguard-360/actions/workflows/ci.yml)
 [![Code Quality](https://github.com/Youss2f/fraudguard-360/actions/workflows/quality.yml/badge.svg)](https://github.com/Youss2f/fraudguard-360/actions/workflows/quality.yml)
 [![Security Scan](https://github.com/Youss2f/fraudguard-360/actions/workflows/deploy.yml/badge.svg)](https://github.com/Youss2f/fraudguard-360/actions/workflows/deploy.yml)
-[![Coverage](https://img.shields.io/badge/Coverage-87%25-brightgreen)](https://github.com/Youss2f/fraudguard-360)
+[![Tests](https://img.shields.io/badge/Tests-pytest-green)](https://github.com/Youss2f/fraudguard-360)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Kubernetes Ready](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
@@ -22,11 +22,13 @@ This project presents FraudGuard-360, an enterprise-grade **Telecom Fraud Detect
 
 FraudGuard-360 is a cloud-native fraud detection platform engineered for telecommunications operators requiring sub-100ms CDR scoring at scale. The system processes Call Detail Records through a multi-stage pipeline combining rule-based risk assessment, machine learning inference, and graph analytics to deliver accurate telecom fraud detection with explainable decisions.
 
-**Key Metrics:**
-- **Throughput:** 12,500+ CDRs per second
-- **Latency:** P99 < 50ms end-to-end scoring
-- **Accuracy:** 97.2% fraud detection rate
-- **Availability:** 99.9% uptime SLA
+**Performance Design Targets:**
+- High-throughput CDR processing via Kafka event streaming
+- Low-latency fraud scoring with Redis caching layer
+- ML-based fraud detection using PyTorch classification models with attention mechanisms
+- Comprehensive test suite with pytest and async testing
+
+> Production benchmarks pending deployment to scaled infrastructure.
 
 **Fraud Types Detected:**
 - **Wangiri:** Single-ring callback scams targeting premium rate numbers
@@ -78,14 +80,16 @@ The machine learning engine powers real-time telecom fraud detection with state-
 | **Inference Engine** | FastAPI + ONNX | Sub-50ms real-time predictions |
 | **Model Registry** | Internal versioning | A/B testing and rollback capabilities |
 
-### Model Performance
+### Model Design
 
-| Metric | Value |
-|--------|-------|
-| **Fraud Detection Rate** | 97.2% |
-| **False Positive Rate** | < 2% |
-| **Inference Latency** | < 50ms P99 |
-| **Model Refresh** | Daily retraining pipeline |
+| Component | Description |
+|-----------|-------------|
+| **Architecture** | Deep neural network with attention mechanism and residual connections |
+| **Features** | 19 engineered features (time-based, amount-based, velocity, geographic) |
+| **Caching** | Redis-backed prediction cache for repeated patterns |
+| **Versioning** | Internal model registry with rollback support |
+
+> Model accuracy metrics will be published after formal evaluation on production-scale datasets.
 
 ---
 
@@ -297,6 +301,14 @@ black --check src/
 | **Infrastructure** | Docker, Kubernetes, Helm, Terraform |
 | **Observability** | Prometheus, Grafana, structlog |
 | **CI/CD** | GitHub Actions |
+
+---
+
+## Repository Structure
+
+> ML model weights, training datasets, and large binary artifacts are managed externally
+> and not committed to this repository. The codebase focuses on application logic,
+> infrastructure definitions, and configuration.
 
 ---
 
