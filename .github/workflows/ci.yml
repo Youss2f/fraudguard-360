@@ -57,9 +57,11 @@ jobs:
 
       - name: Run tests
         working-directory: src/api-gateway
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           if [ -d "tests" ] && [ "$(find tests -name '*.py' -type f 2>/dev/null | head -1)" ]; then
-            pytest tests/ -v --tb=short || echo "Tests completed"
+            pytest tests/ -v --tb=short
           else
             echo "No test files found, skipping pytest"
           fi
@@ -93,9 +95,11 @@ jobs:
 
       - name: Run tests
         working-directory: src/ml-service
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           if [ -d "tests" ] && [ "$(find tests -name 'test_*.py' -type f 2>/dev/null | head -1)" ]; then
-            pytest tests/ -v --tb=short || echo "Tests completed"
+            pytest tests/ -v --tb=short
           else
             echo "No test files found, skipping pytest"
           fi
@@ -129,9 +133,11 @@ jobs:
 
       - name: Run tests
         working-directory: src/risk-scoring-service
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           if [ -d "tests" ] && [ "$(find tests -name 'test_*.py' -type f 2>/dev/null | head -1)" ]; then
-            pytest tests/ -v --tb=short || echo "Tests completed"
+            pytest tests/ -v --tb=short
           else
             echo "No test files found, skipping pytest"
           fi

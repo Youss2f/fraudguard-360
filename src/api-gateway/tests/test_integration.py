@@ -16,6 +16,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import app as app_module
 from app import app
 
 
@@ -27,7 +28,12 @@ def client():
 
 @pytest.fixture
 def mock_kafka_producer():
-    """Mock Kafka producer for testing"""
+    """Mock Kafka producer for testing.
+
+    Patches both kafka_producer and dependency_health so the /transactions
+    endpoint sees a fully healthy producer — matching what a real connected
+    Kafka instance would produce.
+    """
     with patch('app.kafka_producer') as mock:
         producer = MagicMock()
         future = MagicMock()
@@ -38,7 +44,17 @@ def mock_kafka_producer():
         )
         producer.send.return_value = future
         mock.send = producer.send
-        yield mock
+
+        # Flip health flags so the kafka/redis guards inside endpoints pass
+        original_kafka = app_module.dependency_health.kafka_healthy
+        original_redis = app_module.dependency_health.redis_healthy
+        app_module.dependency_health.kafka_healthy = True
+        app_module.dependency_health.redis_healthy = True
+        try:
+            yield mock
+        finally:
+            app_module.dependency_health.kafka_healthy = original_kafka
+            app_module.dependency_health.redis_healthy = original_redis
 
 
 class TestHealthEndpoints:
